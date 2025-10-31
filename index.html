@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DayZ Интерактивная карта</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>DayZ Интерактивная карта</h1>
+            <div class="controls">
+                <button id="addMarkerBtn">Добавить метку</button>
+                <button id="clearMarkersBtn">Очистить все метки</button>
+                <!-- Кнопки импорта/экспорта теперь добавляются через JS -->
+            </div>
+        </div>
+        
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
+        
+        <div class="sidebar">
+            <div class="markers-search">
+                <input type="text" id="searchMarkers" placeholder="Поиск меток по названию...">
+                <div class="search-buttons">
+                    <button id="searchBtn">Поиск</button>
+                    <button id="showAllBtn" style="display:none;">Показать все</button>
+                    <button id="hideOthersBtn">Скрыть остальные</button>
+                </div>
+            </div>
+            
+            <div class="markers-list">
+                <h3>Мои метки</h3>
+                <div id="markersContainer"></div>
+            </div>
+         
+            <!-- Общая прозрачность всех меток -->
+            <div class="control-group">
+                <label>Общая прозрачность:</label>
+                <input type="range" id="globalOpacity" min="0" max="100" value="80">
+                <span id="globalOpacityValue">80%</span>
+            </div>
+        </div>
+    </div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

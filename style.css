@@ -1,0 +1,341 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Arial', sans-serif;
+    background-color: #1a1a1a;
+    color: #fff;
+    overflow: hidden;
+}
+
+.container {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    grid-template-columns: 1fr 300px;
+    height: 100vh;
+    gap: 10px;
+    padding: 10px;
+}
+
+.header {
+    background-color: #2d2d2d;
+    padding: 10px 15px;
+    border-radius: 8px;
+    border: 1px solid #444;
+    grid-column: 1 / -1;
+}
+
+.header h1 {
+    margin-bottom: 8px;
+    color: #e74c3c;
+    font-size: 1.5em;
+}
+
+.controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.controls button, .controls select, .controls input {
+    padding: 6px 10px;
+    background-color: #34495e;
+    color: white;
+    border: 1px solid #4a6572;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    font-size: 0.9em;
+}
+
+.controls button:hover {
+    background-color: #4a6572;
+}
+
+.controls input {
+    flex-grow: 1;
+    min-width: 150px;
+}
+
+/* Специфичные цвета для разных кнопок */
+.controls button#addMarkerBtn:hover {
+    background-color: #27ae60;
+}
+
+.controls button#clearMarkersBtn:hover {
+    background-color: #c0392b;
+}
+
+/* Стиль для кнопки экспорта */
+.controls button:last-child {
+    background-color: #f39c12;
+}
+
+.controls button:last-child:hover {
+    background-color: #e67e22;
+}
+
+.map-container {
+    background-color: #2d2d2d;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #444;
+    grid-column: 1;
+}
+
+#map {
+    width: 100%;
+    height: 100%;
+}
+
+.sidebar {
+    background-color: #2d2d2d;
+    border-radius: 8px;
+    border: 1px solid #444;
+    display: flex;
+    flex-direction: column;
+    grid-column: 2;
+    min-height: 0;
+}
+
+.markers-search {
+    padding: 12px;
+    background: #2d2d2d;
+    border-bottom: 1px solid #444;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.markers-search input {
+    width: 100%;
+    padding: 8px;
+    background: #444;
+    color: white;
+    border: 1px solid #666;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+.search-buttons {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.search-buttons button {
+    flex: 1;
+    padding: 6px 10px;
+    background: #3498db;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.85em;
+    min-width: 60px;
+}
+
+.search-buttons button:hover {
+    background: #2980b9;
+}
+
+.search-buttons button:disabled {
+    background: #7f8c8d;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.markers-list {
+    flex: 1;
+    padding: 12px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.markers-list h3 {
+    margin-bottom: 10px;
+    color: #e74c3c;
+    font-size: 1.1em;
+}
+
+#markersContainer {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.marker-item {
+    background-color: #34495e;
+    padding: 8px;
+    margin: 4px 0;
+    border-radius: 4px;
+    border-left: 4px solid #e74c3c;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9em;
+}
+
+.marker-item .coords {
+    color: #95a5a6;
+    font-size: 0.8em;
+}
+
+.marker-item .type {
+    color: #bdc3c7;
+    font-size: 0.8em;
+    margin-top: 2px;
+}
+
+.marker-item .delete {
+    background-color: #c0392b;
+    color: white;
+    border: none;
+    padding: 3px 6px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.8em;
+}
+
+/* Стили для разных типов меток */
+.marker-default { border-left-color: #3498db !important; }
+.marker-home { border-left-color: #e74c3c !important; }
+.marker-camp { border-left-color: #27ae60 !important; }
+.marker-safezone { border-left-color: #2ecc71 !important; }
+.marker-blackmarket { border-left-color: #34495e !important; }
+.marker-hospital { border-left-color: #e74c8c !important; }
+.marker-sniper { border-left-color: #c0392b !important; }
+.marker-player { border-left-color: #9b59b6 !important; }
+.marker-flag { border-left-color: #d35400 !important; }
+.marker-star { border-left-color: #f1c40f !important; }
+.marker-car { border-left-color: #16a085 !important; }
+.marker-parking { border-left-color: #7f8c8d !important; }
+.marker-heli { border-left-color: #2980b9 !important; }
+.marker-rail { border-left-color: #8e44ad !important; }
+.marker-ship { border-left-color: #3498db !important; }
+.marker-scooter { border-left-color: #1abc9c !important; }
+.marker-bank { border-left-color: #f39c12 !important; }
+.marker-restaurant { border-left-color: #e67e22 !important; }
+.marker-post { border-left-color: #95a5a6 !important; }
+.marker-castle { border-left-color: #7d3c98 !important; }
+.marker-ranger-station { border-left-color: #27ae60 !important; }
+.marker-water { border-left-color: #3498db !important; }
+.marker-triangle { border-left-color: #e74c3c !important; }
+.marker-cow { border-left-color: #8b4513 !important; }
+.marker-bear { border-left-color: #2c3e50 !important; }
+.marker-car-repair { border-left-color: #d35400 !important; }
+.marker-communications { border-left-color: #9b59b6 !important; }
+.marker-roadblock { border-left-color: #c0392b !important; }
+.marker-stadium { border-left-color: #f1c40f !important; }
+.marker-skull { border-left-color: #2c3e50 !important; }
+.marker-rocket { border-left-color: #e74c3c !important; }
+.marker-bbq { border-left-color: #d35400 !important; }
+.marker-ping { border-left-color: #2ecc71 !important; }
+.marker-circle { border-left-color: #3498db !important; }
+.marker-cross { border-left-color: #3498db !important; }
+
+/* Кастомные иконки для Leaflet */
+.custom-marker {
+    background: none;
+    border: none;
+}
+
+.marker-popup {
+    font-family: 'Arial', sans-serif;
+}
+
+.grid-label {
+    background: none !important;
+    border: none !important;
+}
+
+.leaflet-div-icon {
+    background: none !important;
+    border: none !important;
+}
+
+.no-results {
+    padding: 10px;
+    text-align: center;
+    color: #7f8c8d;
+    font-style: italic;
+    font-size: 0.9em;
+}
+
+/* Скрыть кнопку "Скрыть остальные" */
+#hideOthersBtn {
+    display: none !important;
+}
+
+/* Слайдеры прозрачности */
+.control-group {
+    background: #2d2d2d;
+    padding: 10px;
+    margin: 5px 0;
+    border-radius: 5px;
+    border: 1px solid #444;
+}
+
+.control-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 0.9em;
+    color: #ecf0f1;
+}
+
+.control-group input[type="range"] {
+    width: 100%;
+    margin: 5px 0;
+}
+
+.control-group span {
+    font-size: 0.8em;
+    color: #bdc3c7;
+}
+
+.markers-list h3 {
+    margin-bottom: 10px;
+    color: #e74c3c;
+    font-size: 1.1em;
+    display: flex;
+    align-items: center;
+}
+
+#markersCounter {
+    color: #95a5a6;
+    font-size: 0.9em;
+    font-weight: normal;
+    margin-left: 8px;
+    transition: color 0.3s;
+}
+
+.markers-list:hover #markersCounter {
+    color: #bdc3c7;
+}
+
+/* Адаптивность для мобильных устройств */
+@media (max-width: 768px) {
+    .container {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr auto;
+    }
+    
+    .sidebar {
+        grid-column: 1;
+        max-height: 200px;
+    }
+    
+    .controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .controls input {
+        min-width: auto;
+    }
+}
