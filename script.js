@@ -1793,7 +1793,7 @@ class DayZMap {
         }
 
         const exportData = this.prepareExportData();
-        this.downloadJSON(exportData, 'dayz_map_markers.json');
+        this.downloadJSON(exportData, 'PrivateMarkers.json');
     }
 
     // Подготовка данных для экспорта в совместимом формате
