@@ -10,6 +10,45 @@ const CONFIG = {
     mapPixelHeight: 15360
 };
 
+// Константы для типов меток
+const MARKER_TYPES = {
+    default: { name: 'Обычный маркер', color: '#3498db', symbol: '' },
+    cross: { name: 'X', color: '#3498db', symbol: 'X' },
+    home: { name: 'Дом', color: '#e74c3c', symbol: 'H' },
+    camp: { name: 'Лагерь', color: '#27ae60', symbol: 'C' },
+    safezone: { name: 'Безопасная зона', color: '#2ecc71', symbol: 'S' },
+    blackmarket: { name: 'Черный рынок', color: '#34495e', symbol: 'B' },
+    hospital: { name: 'Госпиталь', color: '#e74c8c', symbol: '+' },
+    sniper: { name: 'Снайпер', color: '#c0392b', symbol: '⊙' },
+    player: { name: 'Игрок', color: '#9b59b6', symbol: 'P' },
+    flag: { name: 'Флаг', color: '#d35400', symbol: '⚑' },
+    star: { name: 'Звезда', color: '#f1c40f', symbol: '★' },
+    car: { name: 'Автомобиль', color: '#16a085', symbol: '🚗' },
+    parking: { name: 'Парковка', color: '#7f8c8d', symbol: 'P' },
+    heli: { name: 'Вертолет', color: '#2980b9', symbol: '🚁' },
+    rail: { name: 'Железная дорога', color: '#8e44ad', symbol: '🚆' },
+    ship: { name: 'Корабль', color: '#3498db', symbol: '⛴' },
+    scooter: { name: 'Скутер', color: '#1abc9c', symbol: '🛵' },
+    bank: { name: 'Банк', color: '#f39c12', symbol: '💳' },
+    restaurant: { name: 'Ресторан', color: '#e67e22', symbol: '🍴' },
+    post: { name: 'Почта', color: '#95a5a6', symbol: '✉' },
+    castle: { name: 'Замок', color: '#7d3c98', symbol: '🏰' },
+    'ranger-station': { name: 'Станция рейнджера', color: '#27ae60', symbol: '🌲' },
+    water: { name: 'Вода', color: '#3498db', symbol: '💧' },
+    triangle: { name: 'Треугольник', color: '#e74c3c', symbol: '▲' },
+    cow: { name: 'Корова', color: '#8b4513', symbol: '🐄' },
+    bear: { name: 'Медведь', color: '#2c3e50', symbol: '🐻' },
+    'car-repair': { name: 'Ремонт авто', color: '#d35400', symbol: '🔧' },
+    communications: { name: 'Коммуникации', color: '#9b59b6', symbol: '📡' },
+    roadblock: { name: 'Блокпост', color: '#c0392b', symbol: '🚧' },
+    stadium: { name: 'Стадион', color: '#f1c40f', symbol: '🏟' },
+    skull: { name: 'Череп', color: '#2c3e50', symbol: '💀' },
+    rocket: { name: 'Ракета', color: '#e74c3c', symbol: '🚀' },
+    bbq: { name: 'BBQ', color: '#d35400', symbol: '🍖' },
+    ping: { name: 'Пинг', color: '#2ecc71', symbol: '📍' },
+    circle: { name: 'Круг', color: '#3498db', symbol: '●' }
+};
+
 class DayZMap {
     constructor() {
         this.map = null;
@@ -29,6 +68,7 @@ class DayZMap {
             type: 'default',
             color: '#3498db'
         };
+        this.modalCloseHandlers = new Map(); // Для управления обработчиками модальных окон
         this.init();
     }
 
@@ -102,6 +142,13 @@ class DayZMap {
     initMap() {
         console.log('Создание карты Leaflet...');
         
+        // Проверяем существование элемента карты
+        if (!document.getElementById('map')) {
+            console.error('Element #map not found');
+            this.showError('Элемент карты не найден на странице');
+            return;
+        }
+
         this.map = L.map('map', {
             crs: L.CRS.Simple,
             minZoom: CONFIG.minZoom,
@@ -148,41 +195,47 @@ class DayZMap {
         );
     }
 
-    loadTiles() {
+    async loadTiles() {
         console.log('=== НАЧАЛО ЗАГРУЗКИ ТАЙЛОВ ===');
         
-        let loadedTiles = 0;
-        let errorTiles = 0;
-        const totalTiles = (CONFIG.maxTilesX + 1) * (CONFIG.maxTilesY + 1);
+        const tilePromises = [];
         
         for (let x = 0; x <= CONFIG.maxTilesX; x++) {
             for (let y = 0; y <= CONFIG.maxTilesY; y++) {
                 const tileFileName = this.getTileFileName(x, y);
                 const tileUrl = `tiles_cropped/${tileFileName}`;
-                
                 const bounds = this.tileToLeafletBounds(x, y);
                 
-                this.loadTileImage(tileUrl, bounds, x, y)
-                    .then(() => {
-                        loadedTiles++;
-                        console.log(`✅ Тайл загружен: ${tileFileName}`);
-                    })
-                    .catch((error) => {
-                        errorTiles++;
-                        console.error(`❌ Ошибка загрузки: ${tileFileName}`, error.message);
-                    })
-                    .finally(() => {
-                        this.checkLoadComplete(loadedTiles, errorTiles, totalTiles);
-                    });
+                tilePromises.push(
+                    this.loadTileImage(tileUrl, bounds, x, y)
+                        .then(() => {
+                            console.log(`✅ Тайл загружен: ${tileFileName}`);
+                            return { success: true, tile: tileFileName };
+                        })
+                        .catch((error) => {
+                            console.error(`❌ Ошибка загрузки: ${tileFileName}`, error.message);
+                            return { success: false, tile: tileFileName, error: error.message };
+                        })
+                );
             }
+        }
+
+        try {
+            const results = await Promise.allSettled(tilePromises);
+            this.processTileLoadResults(results);
+        } catch (error) {
+            console.error('Ошибка при загрузке тайлов:', error);
+            this.showError('Критическая ошибка при загрузке карты');
         }
     }
 
     loadTileImage(url, bounds, x, y) {
         return new Promise((resolve, reject) => {
             const testImg = new Image();
+            let timeoutId;
             
             testImg.onload = () => {
+                clearTimeout(timeoutId);
                 try {
                     L.imageOverlay(url, bounds).addTo(this.map);
                     resolve();
@@ -192,22 +245,47 @@ class DayZMap {
             };
             
             testImg.onerror = () => {
+                clearTimeout(timeoutId);
                 reject(new Error('Файл не найден или ошибка загрузки'));
             };
             
             testImg.src = url;
             
-            setTimeout(() => {
+            // Увеличиваем таймаут для медленных соединений
+            timeoutId = setTimeout(() => {
                 if (!testImg.complete) {
                     reject(new Error('Таймаут загрузки'));
                 }
-            }, 3000);
+            }, 10000); // 10 секунд
         });
+    }
+
+    processTileLoadResults(results) {
+        const loaded = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
+        const errors = results.length - loaded;
+        const total = results.length;
+        
+        console.log(`=== ИТОГ ЗАГРУЗКИ: ${loaded} успешно, ${errors} ошибок ===`);
+        
+        if (loaded === 0) {
+            this.showError('Не загружено ни одного тайла! Проверьте папку tiles_cropped');
+        } else {
+            console.log('Карта успешно загружена!');
+            this.loadMarkers();
+            this.addGrid();
+            
+            if (errors > 0) {
+                this.showSuccess(`Загружено ${loaded} тайлов, ${errors} ошибок`);
+            } else {
+                this.showSuccess(`Все ${loaded} тайлов успешно загружены!`);
+            }
+        }
     }
 
     leafletToGameCoords(leafletLatLng) {
         const gameX = (leafletLatLng.lng / 32) * 15360;
-        const gameY = (leafletLatLng.lat / 32) * 15360;
+        // Исправление: инвертируем Y координату
+        const gameY = 15360 - (leafletLatLng.lat / 32) * 15360;
         
         return {
             x: Math.round(gameX),
@@ -221,26 +299,6 @@ class DayZMap {
             return 100;
         } else {
             return 1000;
-        }
-    }
-
-    checkLoadComplete(loaded, errors, total) {
-        if (loaded + errors === total) {
-            console.log(`=== ИТОГ ЗАГРУЗКИ: ${loaded} успешно, ${errors} ошибок ===`);
-            
-            if (loaded === 0) {
-                this.showError('Не загружено ни одного тайла!');
-            } else {
-                console.log('Карта успешно загружена!');
-                this.loadMarkers();
-                this.addGrid();
-                
-                if (errors > 0) {
-                    this.showSuccess(`Загружено ${loaded} тайлов, ${errors} ошибок`);
-                } else {
-                    this.showSuccess(`Все ${loaded} тайлов успешно загружены!`);
-                }
-            }
         }
     }
 
@@ -294,38 +352,42 @@ class DayZMap {
         
         // Добавляем обработчик закрытия
         const closeBtn = document.getElementById('closeErrorBtn');
-        closeBtn.addEventListener('click', () => {
+        const closeHandler = () => {
             errorDiv.remove();
-        });
+            closeBtn.removeEventListener('click', closeHandler);
+        };
+        closeBtn.addEventListener('click', closeHandler);
         
         // Также закрываем по клику на затемненную область
-        errorDiv.addEventListener('click', (e) => {
+        const overlayHandler = (e) => {
             if (e.target === errorDiv) {
                 errorDiv.remove();
-            }
-        });
-        
-        // Закрытие по ESC
-        const closeHandler = (e) => {
-            if (e.key === 'Escape') {
-                errorDiv.remove();
-                document.removeEventListener('keydown', closeHandler);
+                errorDiv.removeEventListener('click', overlayHandler);
             }
         };
-        document.addEventListener('keydown', closeHandler);
+        errorDiv.addEventListener('click', overlayHandler);
         
-        // Автоматическое закрытие через 10 секунд (опционально)
+        // Закрытие по ESC
+        const keyHandler = (e) => {
+            if (e.key === 'Escape') {
+                errorDiv.remove();
+                document.removeEventListener('keydown', keyHandler);
+            }
+        };
+        document.addEventListener('keydown', keyHandler);
+        
+        // Автоматическое закрытие через 10 секунд
         const autoCloseTimeout = setTimeout(() => {
             if (errorDiv.parentNode) {
                 errorDiv.remove();
-                document.removeEventListener('keydown', closeHandler);
+                document.removeEventListener('keydown', keyHandler);
             }
         }, 10000);
         
         // Очистка таймера при ручном закрытии
         closeBtn.addEventListener('click', () => {
             clearTimeout(autoCloseTimeout);
-            document.removeEventListener('keydown', closeHandler);
+            document.removeEventListener('keydown', keyHandler);
         });
     }
 
@@ -356,121 +418,150 @@ class DayZMap {
     }
 
     bindEvents() {
-        document.getElementById('addMarkerBtn').addEventListener('click', () => {
-            this.enableMarkerMode();
-        });
-
-        document.getElementById('clearMarkersBtn').addEventListener('click', () => {
-            this.clearAllMarkers();
-        });
-
-        // Кнопка для экспорта меток
-        const exportButton = document.createElement('button');
-        exportButton.textContent = 'Экспорт меток';
-        exportButton.addEventListener('click', () => {
-            this.exportMarkers();
-        });
-
-        // Добавляем кнопку экспорта в controls
-        document.querySelector('.controls').appendChild(exportButton);
-
-        // Поиск меток
-        document.getElementById('searchBtn').addEventListener('click', () => {
-            const searchInput = document.getElementById('searchMarkers');
-            if (this.isFilterActive) {
-                this.clearSearch();
-            } else {
-                const searchTerm = searchInput.value.trim();
-                if (searchTerm) {
-                    this.searchMarkers(searchTerm);
-                } else {
-                    this.showError('Введите текст для поиска');
-                }
+        try {
+            // Кнопка добавления метки
+            const addMarkerBtn = document.getElementById('addMarkerBtn');
+            if (addMarkerBtn) {
+                addMarkerBtn.addEventListener('click', () => {
+                    this.enableMarkerMode();
+                });
             }
-        });
 
-        document.getElementById('searchMarkers').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                const searchTerm = e.target.value.trim();
-                if (searchTerm) {
-                    this.searchMarkers(searchTerm);
-                } else {
-                    this.showError('Введите текст для поиска');
-                }
+            // Кнопка очистки меток
+            const clearMarkersBtn = document.getElementById('clearMarkersBtn');
+            if (clearMarkersBtn) {
+                clearMarkersBtn.addEventListener('click', () => {
+                    this.clearAllMarkers();
+                });
             }
-        });
 
-        document.getElementById('showAllBtn').addEventListener('click', () => {
-            this.clearSearch();
-        });
+            // Кнопка для экспорта меток
+            const exportButton = document.createElement('button');
+            exportButton.textContent = 'Экспорт меток';
+            exportButton.addEventListener('click', () => {
+                this.exportMarkers();
+            });
+            document.querySelector('.controls').appendChild(exportButton);
 
-        document.getElementById('hideOthersBtn').addEventListener('click', () => {
-            this.hideOtherMarkers();
-        });
+            // Поиск меток
+            const searchBtn = document.getElementById('searchBtn');
+            if (searchBtn) {
+                searchBtn.addEventListener('click', () => {
+                    if (this.isFilterActive) {
+                        this.clearSearch();
+                    } else {
+                        const searchInput = document.getElementById('searchMarkers');
+                        const searchTerm = searchInput.value.trim();
+                        if (searchTerm) {
+                            this.searchMarkers(searchTerm);
+                        } else {
+                            this.showError('Введите текст для поиска');
+                        }
+                    }
+                });
+            }
 
-        const gridToggleBtn = document.createElement('button');
-        gridToggleBtn.textContent = 'Сетка: ВКЛ';
-        gridToggleBtn.addEventListener('click', () => {
-            this.toggleGrid();
-            gridToggleBtn.textContent = this.gridEnabled ? 'Сетка: ВКЛ' : 'Сетка: ВЫКЛ';
-        });
-        document.querySelector('.controls').appendChild(gridToggleBtn);
+            const searchMarkersInput = document.getElementById('searchMarkers');
+            if (searchMarkersInput) {
+                searchMarkersInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        const searchTerm = e.target.value.trim();
+                        if (searchTerm) {
+                            this.searchMarkers(searchTerm);
+                        } else {
+                            this.showError('Введите текст для поиска');
+                        }
+                    }
+                });
+            }
 
-        this.map.on('click', (e) => {
-            if (this.markerModeEnabled) {
+            const showAllBtn = document.getElementById('showAllBtn');
+            if (showAllBtn) {
+                showAllBtn.addEventListener('click', () => {
+                    this.clearSearch();
+                });
+            }
+
+            const hideOthersBtn = document.getElementById('hideOthersBtn');
+            if (hideOthersBtn) {
+                hideOthersBtn.addEventListener('click', () => {
+                    this.hideOtherMarkers();
+                });
+            }
+
+            // Кнопка переключения сетки
+            const gridToggleBtn = document.createElement('button');
+            gridToggleBtn.textContent = 'Сетка: ВКЛ';
+            gridToggleBtn.addEventListener('click', () => {
+                this.toggleGrid();
+                gridToggleBtn.textContent = this.gridEnabled ? 'Сетка: ВКЛ' : 'Сетка: ВЫКЛ';
+            });
+            document.querySelector('.controls').appendChild(gridToggleBtn);
+
+            // События карты
+            this.map.on('click', (e) => {
+                if (this.markerModeEnabled) {
+                    const gameCoords = this.leafletToGameCoords(e.latlng);
+                    this.addMarker(e.latlng, gameCoords);
+                }
+            });
+
+            this.map.on('movestart', () => {
+                this.disableMarkerMode();
+            });
+
+            this.map.on('mousemove', (e) => {
                 const gameCoords = this.leafletToGameCoords(e.latlng);
-                this.addMarker(e.latlng, gameCoords);
+                this.showCoordinates(gameCoords);
+            });
+
+            this.map.on('zoomend', () => {
+                if (this.gridEnabled) {
+                    this.updateGrid();
+                }
+            });
+
+            this.map.on('moveend', () => {
+                if (this.gridEnabled) {
+                    this.updateAxes();
+                }
+            });
+
+            // Кнопка для импорта меток из JSON
+            const importButton = document.createElement('button');
+            importButton.textContent = 'Импорт меток';
+            importButton.style.marginLeft = '10px';
+
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = '.json';
+            fileInput.style.display = 'none';
+            fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
+
+            importButton.addEventListener('click', () => {
+                fileInput.click();
+            });
+
+            document.querySelector('.controls').appendChild(importButton);
+            document.querySelector('.controls').appendChild(fileInput);
+
+            // Обработчик общей прозрачности  
+            const globalOpacitySlider = document.getElementById('globalOpacity');
+            if (globalOpacitySlider) {
+                globalOpacitySlider.addEventListener('input', (e) => {
+                    const value = e.target.value;
+                    const opacityValueElement = document.getElementById('globalOpacityValue');
+                    if (opacityValueElement) {
+                        opacityValueElement.textContent = `${value}%`;
+                    }
+                    this.globalMarkerOpacity = value / 100;
+                    this.updateAllMarkersOpacity();
+                });
             }
-        });
 
-        this.map.on('movestart', () => {
-            this.disableMarkerMode();
-        });
-
-        this.map.on('mousemove', (e) => {
-            const gameCoords = this.leafletToGameCoords(e.latlng);
-            this.showCoordinates(gameCoords);
-        });
-
-        this.map.on('zoomend', () => {
-            if (this.gridEnabled) {
-                this.updateGrid();
-            }
-        });
-
-        this.map.on('moveend', () => {
-            if (this.gridEnabled) {
-                this.updateAxes();
-            }
-        });
-
-        // Кнопка для импорта меток из JSON
-        const importButton = document.createElement('button');
-        importButton.textContent = 'Импорт меток';
-        importButton.style.marginLeft = '10px';
-
-        const fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.accept = '.json';
-        fileInput.style.display = 'none';
-        fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
-
-        importButton.addEventListener('click', () => {
-            fileInput.click();
-        });
-
-        document.querySelector('.controls').appendChild(importButton);
-        document.querySelector('.controls').appendChild(fileInput);
-
-
-
-        // Обработчик общей прозрачности  
-        document.getElementById('globalOpacity').addEventListener('input', (e) => {
-            const value = e.target.value;
-            document.getElementById('globalOpacityValue').textContent = `${value}%`;
-            this.globalMarkerOpacity = value / 100;
-            this.updateAllMarkersOpacity();
-        });
+        } catch (error) {
+            console.error('Ошибка при привязке событий:', error);
+        }
     }
 
     toggleGrid() {
@@ -517,12 +608,12 @@ class DayZMap {
         const minY = Math.floor(visibleSouthWest.y / gridSize) * gridSize;
         const maxY = Math.ceil(visibleNorthEast.y / gridSize) * gridSize;
 
-        for (let x = minX; x <= maxX; x += gridSize) {
-            if (x >= 0 && x <= CONFIG.mapPixelWidth) {
-                const leafletX = (x / CONFIG.mapPixelWidth) * 32;
-                const label = L.marker([31.9, leafletX], {
-                    icon: L.divIcon({
-                        className: 'axis-label',
+        for (let x = minX; x <= maxX; x += gridSize) { 
+            if (x >= 0 && x <= CONFIG.mapPixelWidth) { 
+                const leafletX = (x / CONFIG.mapPixelWidth) * 32; 
+                const label = L.marker([31.9, leafletX], { 
+                    icon: L.divIcon({ 
+                        className: 'axis-label', 
                         html: `<div style="color: white; background: rgba(0,0,0,0.7); padding: 2px 4px; border-radius: 2px; font-size: 11px; font-weight: bold;">${this.formatGridCoordinate(x)}</div>`,
                         iconSize: [40, 20],
                         iconAnchor: [20, 10]
@@ -532,12 +623,12 @@ class DayZMap {
             }
         }
 
-        for (let y = minY; y <= maxY; y += gridSize) {
-            if (y >= 0 && y <= CONFIG.mapPixelHeight) {
-                const leafletY = (y / CONFIG.mapPixelHeight) * 32;
-                const label = L.marker([leafletY, 31.9], {
-                    icon: L.divIcon({
-                        className: 'axis-label',
+        for (let y = minY; y <= maxY; y += gridSize) { 
+            if (y >= 0 && y <= CONFIG.mapPixelHeight) { 
+                const leafletY = (y / CONFIG.mapPixelHeight) * 32; 
+                const label = L.marker([leafletY, 31.9], { 
+                    icon: L.divIcon({ 
+                        className: 'axis-label', 
                         html: `<div style="color: white; background: rgba(0,0,0,0.7); padding: 2px 4px; border-radius: 2px; font-size: 11px; font-weight: bold;">${this.formatGridCoordinate(y)}</div>`,
                         iconSize: [40, 20],
                         iconAnchor: [20, 10]
@@ -556,35 +647,27 @@ class DayZMap {
         const zoom = this.map.getZoom();
         const opacity = zoom >= 8 ? 0.3 : 0.2;
 
-        for (let x = 0; x <= stepsX; x++) {
-            const pixelX = x * gridSize;
-            const leafletX = (pixelX / CONFIG.mapPixelWidth) * 32;
-            
-            L.polyline([
-                [0, leafletX],
-                [32, leafletX]
-            ], {
-                color: 'rgba(255, 255, 255, 0.3)',
-                weight: 1,
-                opacity: opacity,
-                interactive: false
-            }).addTo(this.gridLayer);
-        }
-
-        for (let y = 0; y <= stepsY; y++) {
-            const pixelY = y * gridSize;
-            const leafletY = (pixelY / CONFIG.mapPixelHeight) * 32;
-            
-            L.polyline([
-                [leafletY, 0],
-                [leafletY, 32]
-            ], {
-                color: 'rgba(255, 255, 255, 0.3)',
-                weight: 1,
-                opacity: opacity,
-                interactive: false
-            }).addTo(this.gridLayer);
-        }
+        for (let x = 0; x <= stepsX; x++) { 
+            const pixelX = x * gridSize; 
+            const leafletX = (pixelX / CONFIG.mapPixelWidth) * 32; 
+            L.polyline([ [0, leafletX], [32, leafletX] ], { 
+                color: 'rgba(255, 255, 255, 0.3)', 
+                weight: 1, 
+                opacity: opacity, 
+                interactive: false 
+            }).addTo(this.gridLayer); 
+        } 
+        
+        for (let y = 0; y <= stepsY; y++) { 
+            const pixelY = y * gridSize; 
+            const leafletY = (pixelY / CONFIG.mapPixelHeight) * 32; 
+            L.polyline([ [leafletY, 0], [leafletY, 32] ], { 
+                color: 'rgba(255, 255, 255, 0.3)', 
+                weight: 1, 
+                opacity: opacity, 
+                interactive: false 
+            }).addTo(this.gridLayer); 
+        } 
     }
 
     removeGrid() {
@@ -624,16 +707,20 @@ class DayZMap {
     enableMarkerMode() {
         this.markerModeEnabled = true;
         const btn = document.getElementById('addMarkerBtn');
-        btn.style.backgroundColor = '#27ae60';
-        btn.textContent = 'Кликните на карту для размещения метки';
+        if (btn) {
+            btn.style.backgroundColor = '#27ae60';
+            btn.textContent = 'Кликните на карту для размещения метки';
+        }
         this.map.getContainer().style.cursor = 'crosshair';
     }
 
     disableMarkerMode() {
         this.markerModeEnabled = false;
         const btn = document.getElementById('addMarkerBtn');
-        btn.style.backgroundColor = '';
-        btn.textContent = 'Добавить метку';
+        if (btn) {
+            btn.style.backgroundColor = '';
+            btn.textContent = 'Добавить метку';
+        }
         this.map.getContainer().style.cursor = '';
     }
 
@@ -646,13 +733,14 @@ class DayZMap {
         );
     }
 
-	addMarker(leafletLatLng, gameCoords) {
-			// Показываем модальное окно для ввода параметров метки
-			this.showAddMarkerModal(leafletLatLng, gameCoords);
-	}
-	
-	showAddMarkerModal(leafletLatLng, gameCoords) {
+    addMarker(leafletLatLng, gameCoords) {
+        // Показываем модальное окно для ввода параметров метки
+        this.showAddMarkerModal(leafletLatLng, gameCoords);
+    }
+    
+    showAddMarkerModal(leafletLatLng, gameCoords) {
         const modal = document.createElement('div');
+        modal.className = 'marker-modal';
         modal.style.cssText = `
             position: fixed;
             top: 50%;
@@ -691,8 +779,7 @@ class DayZMap {
             <h3>Добавление новой метки</h3>
             <div style="margin-bottom: 15px;">
                 <label>Текст метки:</label>
-                <input type="text" id="newMarkerText" value="${this.lastMarkerParams.text}" 
-                       style="width: 100%; padding: 5px; margin-top: 5px; background: #444; color: white; border: 1px solid #666;">
+                <input type="text" id="newMarkerText" value="${this.lastMarkerParams.text}" style="width: 100%; padding: 5px; margin-top: 5px; background: #444; color: white; border: 1px solid #666;">
             </div>
             <div style="margin-bottom: 15px;">
                 <label>Тип метки:</label>
@@ -703,17 +790,15 @@ class DayZMap {
             <div style="margin-bottom: 15px;">
                 <label>Цвет метки (RGB):</label>
                 <div style="display: flex; gap: 5px; margin-top: 5px; align-items: center;">
-                    <input type="number" id="newColorR" min="0" max="255" value="${r}" placeholder="R" 
-                           style="width: 60px; padding: 5px; background: #444; color: white; border: 1px solid #666;">
-                    <input type="number" id="newColorG" min="0" max="255" value="${g}" placeholder="G" 
-                           style="width: 60px; padding: 5px; background: #444; color: white; border: 1px solid #666;">
-                    <input type="number" id="newColorB" min="0" max="255" value="${b}" placeholder="B" 
-                           style="width: 60px; padding: 5px; background: #444; color: white; border: 1px solid #666;">
-                    <div style="width: 30px; height: 30px; background: ${this.lastMarkerParams.color}; border: 1px solid white;" id="newColorPreview"></div>
+                    <input type="number" id="newColorR" min="0" max="255" value="${r}" placeholder="R" style="width: 60px; padding: 5px; background: #444; color: white; border: 1px solid #666;">
+                    <input type="number" id="newColorG" min="0" max="255" value="${g}" placeholder="G" style="width: 60px; padding: 5px; background: #444; color: white; border: 1px solid #666;">
+                    <input type="number" id="newColorB" min="0" max="255" value="${b}" placeholder="B" style="width: 60px; padding: 5px; background: #444; color: white; border: 1px solid #666;">
+                    <div style="width: 30px; height: 30px; background: ${this.lastMarkerParams.color}; border: 1px solid white;" id="newColorPreview"/>
                 </div>
             </div>
             <div style="margin-bottom: 15px; padding: 10px; background: #34495e; border-radius: 4px;">
-                <strong>Координаты:</strong><br>
+                <strong>Координаты:</strong>
+                <br>
                 X: ${gameCoords.x}<br>
                 Y: ${gameCoords.y}
             </div>
@@ -737,33 +822,48 @@ class DayZMap {
         document.getElementById('newColorG').addEventListener('input', updateColorPreview);
         document.getElementById('newColorB').addEventListener('input', updateColorPreview);
 
-        document.getElementById('saveNewMarker').addEventListener('click', () => {
+        // Создаем обработчики с правильным управлением памятью
+        const saveHandler = () => {
             this.saveNewMarker(leafletLatLng, gameCoords);
-            document.body.removeChild(modal);
-        });
+            this.closeModal(modal);
+        };
 
-        document.getElementById('cancelNewMarker').addEventListener('click', () => {
-            document.body.removeChild(modal);
+        const cancelHandler = () => {
+            this.closeModal(modal);
             this.disableMarkerMode();
-        });
+        };
 
-        // Закрытие по ESC
-        const closeHandler = (e) => {
+        const keyHandler = (e) => {
             if (e.key === 'Escape') {
-                document.body.removeChild(modal);
+                this.closeModal(modal);
                 this.disableMarkerMode();
-                document.removeEventListener('keydown', closeHandler);
             }
         };
-        document.addEventListener('keydown', closeHandler);
 
-        // Очистка обработчика при закрытии модалки
-        modal.addEventListener('remove', () => {
-            document.removeEventListener('keydown', closeHandler);
+        document.getElementById('saveNewMarker').addEventListener('click', saveHandler);
+        document.getElementById('cancelNewMarker').addEventListener('click', cancelHandler);
+        document.addEventListener('keydown', keyHandler);
+
+        // Сохраняем обработчики для последующей очистки
+        this.modalCloseHandlers.set(modal, {
+            saveHandler,
+            cancelHandler,
+            keyHandler
         });
     }
-	
-	saveNewMarker(leafletLatLng, gameCoords) {
+
+    closeModal(modal) {
+        const handlers = this.modalCloseHandlers.get(modal);
+        if (handlers) {
+            document.removeEventListener('keydown', handlers.keyHandler);
+            this.modalCloseHandlers.delete(modal);
+        }
+        if (modal.parentNode) {
+            modal.parentNode.removeChild(modal);
+        }
+    }
+    
+    saveNewMarker(leafletLatLng, gameCoords) {
         const markerText = document.getElementById('newMarkerText').value || 'Метка';
         const markerType = document.getElementById('newMarkerType').value;
         const r = document.getElementById('newColorR').value;
@@ -804,15 +904,39 @@ class DayZMap {
             interactive: false
         }).addTo(this.map);
 
+        // Для новых меток создаем базовый набор оригинальных данных
+        const originalData = {
+            type: 5,
+            uid: Date.now(),
+            name: markerText,
+            icon: this.getIconPathFromType(markerType),
+            position: [gameCoords.x, 0, gameCoords.y], // Z = 0 для новых меток
+            currentSubgroup: 0,
+            colorA: 255,
+            colorR: parseInt(r),
+            colorG: parseInt(g),
+            colorB: parseInt(b),
+            creatorSteamID: "",
+            circleRadius: 0.0,
+            circleColorA: 255,
+            circleColorR: 255,
+            circleColorG: 255,
+            circleColorB: 255,
+            circleStriked: 0,
+            circleLayer: 0,
+            showAllPlayerNametags: 0
+        };
+
         const markerData = {
             id: Date.now(),
             leafletLatLng: { lat: leafletLatLng.lat, lng: leafletLatLng.lng },
-            gameCoords: gameCoords,
+            gameCoords: { ...gameCoords, z: 0 }, // Сохраняем Z координату
             text: markerText,
             type: markerType,
             color: markerColor,
             marker: marker,
-            textLabel: textLabel
+            textLabel: textLabel,
+            originalData: originalData // Сохраняем оригинальные данные
         };
 
         marker.on('dblclick', () => {
@@ -828,41 +952,32 @@ class DayZMap {
     }
 
     createMarkerIcon(type, customColor = null, opacity = this.globalMarkerOpacity) {
-		const colors = {
-			default: '#3498db', home: '#e74c3c', camp: '#27ae60', safezone: '#2ecc71', blackmarket: '#34495e',
-			hospital: '#e74c8c', sniper: '#c0392b', player: '#9b59b6', flag: '#d35400', star: '#f1c40f',
-			car: '#16a085', parking: '#7f8c8d', heli: '#2980b9', rail: '#8e44ad', ship: '#3498db',
-			scooter: '#1abc9c', bank: '#f39c12', restaurant: '#e67e22', post: '#95a5a6', castle: '#7d3c98',
-			'ranger-station': '#27ae60', water: '#3498db', triangle: '#e74c3c', cow: '#8b4513', bear: '#2c3e50',
-			'car-repair': '#d35400', communications: '#9b59b6', roadblock: '#c0392b', stadium: '#f1c40f',
-			skull: '#2c3e50', rocket: '#e74c3c', bbq: '#d35400', ping: '#2ecc71', circle: '#3498db', cross: '#3498db'
-		};
+        const markerType = MARKER_TYPES[type] || MARKER_TYPES.default;
+        const color = customColor || markerType.color;
 
-		const color = customColor || colors[type] || '#3498db';
-
-		return L.divIcon({
-			className: `custom-marker marker-${type}`,
-			html: `
-				<div style="
-					background-color: ${color};
-					width: 32px;
-					height: 32px;
-					border-radius: ${this.getMarkerShape(type)};
-					border: 3px solid white;
-					box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-					display: flex;
-					align-items: center;
-					justify-content: center;
-					font-size: 14px;
-					color: white;
-					font-weight: bold;
-					opacity: ${opacity};
-				">${this.getMarkerSymbol(type)}</div>
-			`,
-			iconSize: [32, 32],
-			iconAnchor: [16, 16]
-		});
-	}
+        return L.divIcon({
+            className: `custom-marker marker-${type}`,
+            html: `
+                <div style="
+                    background-color: ${color};
+                    width: 32px;
+                    height: 32px;
+                    border-radius: ${this.getMarkerShape(type)};
+                    border: 3px solid white;
+                    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 14px;
+                    color: white;
+                    font-weight: bold;
+                    opacity: ${opacity};
+                ">${markerType.symbol}</div>
+            `,
+            iconSize: [32, 32],
+            iconAnchor: [16, 16]
+        });
+    }
 
     createTextLabel(text, color, opacity = this.globalMarkerOpacity) {
         return L.divIcon({
@@ -883,16 +998,8 @@ class DayZMap {
     }
 
     getMarkerColor(type) {
-        const colors = {
-            default: '#3498db', cross: '#3498db', home: '#e74c3c', camp: '#27ae60', safezone: '#2ecc71', blackmarket: '#34495e',
-            hospital: '#e74c8c', sniper: '#c0392b', player: '#9b59b6', flag: '#d35400', star: '#f1c40f',
-            car: '#16a085', parking: '#7f8c8d', heli: '#2980b9', rail: '#8e44ad', ship: '#3498db',
-            scooter: '#1abc9c', bank: '#f39c12', restaurant: '#e67e22', post: '#95a5a6', castle: '#7d3c98',
-            'ranger-station': '#27ae60', water: '#3498db', triangle: '#e74c3c', cow: '#8b4513', bear: '#2c3e50',
-            'car-repair': '#d35400', communications: '#9b59b6', roadblock: '#c0392b', stadium: '#f1c40f',
-            skull: '#2c3e50', rocket: '#e74c3c', bbq: '#d35400', ping: '#2ecc71', circle: '#3498db'
-        };
-        return colors[type] || '#3498db';
+        const markerType = MARKER_TYPES[type] || MARKER_TYPES.default;
+        return markerType.color;
     }
 
     getMarkerShape(type) {
@@ -910,28 +1017,13 @@ class DayZMap {
     }
 
     getMarkerSymbol(type) {
-        const symbols = {
-            home: 'H', camp: 'C', safezone: 'S', blackmarket: 'B', hospital: '+', sniper: '⊙', player: 'P',
-            flag: '⚑', star: '★', car: '🚗', parking: 'P', heli: '🚁', rail: '🚆', ship: '⛴', scooter: '🛵',
-            bank: '💳', restaurant: '🍴', post: '✉', castle: '🏰', 'ranger-station': '🌲', water: '💧',
-            triangle: '▲', cow: '🐄', bear: '🐻', 'car-repair': '🔧', communications: '📡', roadblock: '🚧',
-            stadium: '🏟', skull: '💀', rocket: '🚀', bbq: '🍖', ping: '📍', circle: '●', cross: 'X'
-        };
-        return symbols[type] || '';
+        const markerType = MARKER_TYPES[type] || MARKER_TYPES.default;
+        return markerType.symbol;
     }
 
     getMarkerTypeName(type) {
-        const names = {
-            default: 'Обычный маркер', home: 'Дом', camp: 'Лагерь', safezone: 'Безопасная зона',
-            blackmarket: 'Черный рынок', hospital: 'Госпиталь', sniper: 'Снайпер', player: 'Игрок',
-            flag: 'Флаг', star: 'Звезда', car: 'Автомобиль', parking: 'Парковка', heli: 'Вертолет',
-            rail: 'Железная дорога', ship: 'Корабль', scooter: 'Скутер', bank: 'Банк', restaurant: 'Ресторан',
-            post: 'Почта', castle: 'Замок', 'ranger-station': 'Станция рейнджера', water: 'Вода',
-            triangle: 'Треугольник', cow: 'Корова', bear: 'Медведь', 'car-repair': 'Ремонт авто',
-            communications: 'Коммуникации', roadblock: 'Блокпост', stadium: 'Стадион', skull: 'Череп',
-            rocket: 'Ракета', bbq: 'BBQ', ping: 'Пинг', circle: 'Круг', 'cross': 'X'
-        };
-        return names[type] || 'Обычный маркер';
+        const markerType = MARKER_TYPES[type] || MARKER_TYPES.default;
+        return markerType.name;
     }
 
     editMarker(markerData) {
@@ -941,6 +1033,7 @@ class DayZMap {
 
     showEditModal(markerData) {
         const modal = document.createElement('div');
+        modal.className = 'marker-modal';
         modal.style.cssText = `
             position: fixed;
             top: 50%;
@@ -993,7 +1086,7 @@ class DayZMap {
                     <input type="number" id="editColorR" min="0" max="255" value="${r}" placeholder="R" style="width: 60px; padding: 5px; background: #444; color: white; border: 1px solid #666;">
                     <input type="number" id="editColorG" min="0" max="255" value="${g}" placeholder="G" style="width: 60px; padding: 5px; background: #444; color: white; border: 1px solid #666;">
                     <input type="number" id="editColorB" min="0" max="255" value="${b}" placeholder="B" style="width: 60px; padding: 5px; background: #444; color: white; border: 1px solid #666;">
-                    <div style="width: 30px; height: 30px; background: ${markerData.color}; border: 1px solid white;" id="colorPreview"></div>
+                    <div style="width: 30px; height: 30px; background: ${markerData.color}; border: 1px solid white;" id="colorPreview"/>
                 </div>
             </div>
             <div style="display: flex; justify-content: space-between; margin-top: 20px;">
@@ -1017,20 +1110,40 @@ class DayZMap {
         document.getElementById('editColorG').addEventListener('input', updateColorPreview);
         document.getElementById('editColorB').addEventListener('input', updateColorPreview);
 
-        document.getElementById('saveEdit').addEventListener('click', () => {
+        // Создаем обработчики с правильным управлением памятью
+        const saveHandler = () => {
             this.saveMarkerEdit(markerData);
-            document.body.removeChild(modal);
-        });
+            this.closeModal(modal);
+        };
 
-        document.getElementById('deleteMarker').addEventListener('click', () => {
+        const deleteHandler = () => {
             if (confirm('Вы уверены, что хотите удалить эту метку?')) {
                 this.removeMarker(markerData.id);
-                document.body.removeChild(modal);
+                this.closeModal(modal);
             }
-        });
+        };
 
-        document.getElementById('cancelEdit').addEventListener('click', () => {
-            document.body.removeChild(modal);
+        const cancelHandler = () => {
+            this.closeModal(modal);
+        };
+
+        const keyHandler = (e) => {
+            if (e.key === 'Escape') {
+                this.closeModal(modal);
+            }
+        };
+
+        document.getElementById('saveEdit').addEventListener('click', saveHandler);
+        document.getElementById('deleteMarker').addEventListener('click', deleteHandler);
+        document.getElementById('cancelEdit').addEventListener('click', cancelHandler);
+        document.addEventListener('keydown', keyHandler);
+
+        // Сохраняем обработчики для последующей очистки
+        this.modalCloseHandlers.set(modal, {
+            saveHandler,
+            deleteHandler,
+            cancelHandler,
+            keyHandler
         });
     }
 
@@ -1053,6 +1166,15 @@ class DayZMap {
         markerData.type = newType;
         markerData.color = newColor;
 
+        // Обновляем оригинальные данные если они есть
+        if (markerData.originalData) {
+            markerData.originalData.name = newText;
+            markerData.originalData.icon = this.getIconPathFromType(newType);
+            markerData.originalData.colorR = parseInt(r);
+            markerData.originalData.colorG = parseInt(g);
+            markerData.originalData.colorB = parseInt(b);
+        }
+
         const newIcon = this.createMarkerIcon(newType, newColor, this.globalMarkerOpacity);
         markerData.marker.setIcon(newIcon);
 
@@ -1064,7 +1186,7 @@ class DayZMap {
                 <strong>${newText}</strong>
                 <br>
                 Тип: ${this.getMarkerTypeName(newType)}<br>
-                Координаты: X:${markerData.gameCoords.x} Y:${markerData.gameCoords.y}
+                Координаты: X:${markerData.gameCoords.x} Y:${markerData.gameCoords.y}${markerData.gameCoords.z ? ` Z:${markerData.gameCoords.z}` : ''}
             </div>
         `);
 
@@ -1075,21 +1197,10 @@ class DayZMap {
     }
 
     getMarkerTypeOptions(currentType) {
-        const types = {
-            default: 'Обычный маркер', home: 'Дом', camp: 'Лагерь', safezone: 'Безопасная зона',
-            blackmarket: 'Черный рынок', hospital: 'Госпиталь', sniper: 'Снайпер', player: 'Игрок',
-            flag: 'Флаг', star: 'Звезда', car: 'Автомобиль', parking: 'Парковка', heli: 'Вертолет',
-            rail: 'Железная дорога', ship: 'Корабль', scooter: 'Скутер', bank: 'Банк', restaurant: 'Ресторан',
-            post: 'Почта', castle: 'Замок', 'ranger-station': 'Станция рейнджера', water: 'Вода',
-            triangle: 'Треугольник', cow: 'Корова', bear: 'Медведь', 'car-repair': 'Ремонт авто',
-            communications: 'Коммуникации', roadblock: 'Блокпост', stadium: 'Стадион', skull: 'Череп',
-            rocket: 'Ракета', bbq: 'BBQ', ping: 'Пинг', circle: 'Круг', cross: 'X'
-        };
-
         let options = '';
-        for (const [key, value] of Object.entries(types)) {
+        for (const [key, value] of Object.entries(MARKER_TYPES)) {
             const selected = key === currentType ? 'selected' : '';
-            options += `<option value="${key}" ${selected}>${value}</option>`;
+            options += `<option value="${key}" ${selected}>${value.name}</option>`;
         }
         return options;
     }
@@ -1119,19 +1230,20 @@ class DayZMap {
             font-weight: normal;
             margin-left: 8px;
         `;
-        
         const markersTitle = document.querySelector('.markers-list h3');
-        markersTitle.appendChild(counterSpan);
-        
+        if (markersTitle) {
+            markersTitle.appendChild(counterSpan);
+        }
         return counterSpan;
     }
 
     updateMarkersList() {
         const container = document.getElementById('markersContainer');
+        if (!container) return;
+        
         container.innerHTML = '';
-
         const markersToShow = this.searchFilter ? this.filteredMarkers : this.markers;
-
+        
         if (this.searchFilter && markersToShow.length === 0) {
             container.innerHTML = `<div class="no-results">Метки по запросу "${this.searchFilter}" не найдены</div>`;
         } else {
@@ -1174,7 +1286,8 @@ class DayZMap {
         const searchBtn = document.getElementById('searchBtn');
         const showAllBtn = document.getElementById('showAllBtn');
         const hideOthersBtn = document.getElementById('hideOthersBtn');
-        const searchInput = document.getElementById('searchMarkers');
+
+        if (!searchBtn || !showAllBtn || !hideOthersBtn) return;
 
         if (this.isFilterActive && this.searchFilter) {
             searchBtn.textContent = 'Отменить';
@@ -1207,11 +1320,12 @@ class DayZMap {
                 gameCoords: m.gameCoords,
                 text: m.text,
                 type: m.type,
-                color: m.color
+                color: m.color,
+                originalData: m.originalData // Сохраняем оригинальные данные
             })),
             settings: {
                 globalOpacity: this.globalMarkerOpacity,
-                lastMarkerParams: this.lastMarkerParams // Сохраняем параметры
+                lastMarkerParams: this.lastMarkerParams
             }
         };
         localStorage.setItem('dayzMapData', JSON.stringify(data));
@@ -1244,7 +1358,10 @@ class DayZMap {
             this.updateMarkersList();
 
             // Сбрасываем поле поиска
-            document.getElementById('searchMarkers').value = '';
+            const searchInput = document.getElementById('searchMarkers');
+            if (searchInput) {
+                searchInput.value = '';
+            }
             
             // Обновляем состояние кнопок поиска
             this.updateSearchButtons();
@@ -1287,9 +1404,8 @@ class DayZMap {
                 // Загружаем настройки
                 if (data.settings) {
                     this.globalMarkerOpacity = data.settings.globalOpacity || 0.8;
-                    this.currentMarkerOpacity = data.settings.currentOpacity || 0.8;
-					
-					// Загружаем последние параметры если есть
+                    
+                    // Загружаем последние параметры если есть
                     if (data.settings.lastMarkerParams) {
                         this.lastMarkerParams = data.settings.lastMarkerParams;
                     }
@@ -1298,7 +1414,7 @@ class DayZMap {
                     const globalOpacitySlider = document.getElementById('globalOpacity');
                     const globalOpacityValue = document.getElementById('globalOpacityValue');
                     
-                    if (globalOpacitySlider) {
+                    if (globalOpacitySlider && globalOpacityValue) {
                         globalOpacitySlider.value = this.globalMarkerOpacity * 100;
                         globalOpacityValue.textContent = `${Math.round(this.globalMarkerOpacity * 100)}%`;
                     }
@@ -1322,7 +1438,7 @@ class DayZMap {
                                 <div class="marker-popup">
                                     <strong>${markerData.text}</strong><br>
                                     Тип: ${this.getMarkerTypeName(markerData.type)}<br>
-                                    Координаты: X:${markerData.gameCoords.x} Y:${markerData.gameCoords.y}
+                                    Координаты: X:${markerData.gameCoords.x} Y:${markerData.gameCoords.y}${markerData.gameCoords.z ? ` Z:${markerData.gameCoords.z}` : ''}
                                 </div>
                             `);
 
@@ -1353,7 +1469,7 @@ class DayZMap {
                 console.error('Ошибка загрузки меток:', e);
             }
         }
-	this.updateAllMarkersOpacity();
+        this.updateAllMarkersOpacity();
     }
 
     // Функция для массовой загрузки меток из JSON
@@ -1423,7 +1539,7 @@ class DayZMap {
                             // Определяем тип метки
                             const markerType = this.getMarkerTypeFromIcon(marker.icon);
                             
-                            // Получаем цвет из RGB компонентов (используем значения по умолчанию если нет)
+                            // Получаем цвет из RGB компонентов (используем оригинальные значения)
                             const colorR = marker.colorR !== undefined ? marker.colorR : 255;
                             const colorG = marker.colorG !== undefined ? marker.colorG : 255;
                             const colorB = marker.colorB !== undefined ? marker.colorB : 255;
@@ -1434,7 +1550,7 @@ class DayZMap {
                             const leafletY = (y / CONFIG.mapPixelHeight) * 32;
                             const leafletLatLng = L.latLng(leafletY, leafletX);
 
-                            const gameCoords = { x: Math.round(x), y: Math.round(y) };
+                            const gameCoords = { x: Math.round(x), y: Math.round(y), z: z };
 
                             // Создаем метку с глобальной прозрачностью
                             const icon = this.createMarkerIcon(markerType, markerColor, this.globalMarkerOpacity);
@@ -1445,7 +1561,7 @@ class DayZMap {
                                     <div class="marker-popup">
                                         <strong>${markerName || 'Без названия'}</strong><br>
                                         Тип: ${this.getMarkerTypeName(markerType)}<br>
-                                        Координаты: X:${gameCoords.x} Y:${gameCoords.y}
+                                        Координаты: X:${gameCoords.x} Y:${gameCoords.y} Z:${z}
                                     </div>
                                 `);
 
@@ -1458,6 +1574,12 @@ class DayZMap {
                                 }).addTo(this.map);
                             }
 
+                            // Сохраняем ВСЕ оригинальные параметры из файла КАК ЕСТЬ
+                            const originalData = { ...marker };
+                            
+                            // Обновляем только координаты на корректные значения
+                            originalData.position = [x, z, y];
+
                             const markerData = {
                                 id: Date.now() + Math.random(),
                                 leafletLatLng: { lat: leafletLatLng.lat, lng: leafletLatLng.lng },
@@ -1466,7 +1588,8 @@ class DayZMap {
                                 type: markerType,
                                 color: markerColor,
                                 marker: markerObj,
-                                textLabel: textLabel
+                                textLabel: textLabel,
+                                originalData: originalData // Сохраняем ВСЕ оригинальные данные как есть
                             };
 
                             markerObj.on('dblclick', () => {
@@ -1546,20 +1669,23 @@ class DayZMap {
         event.target.value = '';
     }
 
-    //функция обновления прозрачности всех меток
-		updateAllMarkersOpacity() {
-			this.markers.forEach(markerData => {
-				// Обновляем основную иконку метки
-				const newIcon = this.createMarkerIcon(markerData.type, markerData.color, this.globalMarkerOpacity);
-				markerData.marker.setIcon(newIcon);
+    // Функция обновления прозрачности всех меток
+    updateAllMarkersOpacity() {
+        // Используем requestAnimationFrame для лучшей производительности
+        requestAnimationFrame(() => {
+            this.markers.forEach(markerData => {
+                // Обновляем основную иконку метки
+                const newIcon = this.createMarkerIcon(markerData.type, markerData.color, this.globalMarkerOpacity);
+                markerData.marker.setIcon(newIcon);
         
-				// Обновляем текстовую метку
-				if (markerData.textLabel) {
-					const newTextLabel = this.createTextLabel(markerData.text, markerData.color, this.globalMarkerOpacity);
-					markerData.textLabel.setIcon(newTextLabel);
-				}
-			});
-		}
+                // Обновляем текстовую метку
+                if (markerData.textLabel) {
+                    const newTextLabel = this.createTextLabel(markerData.text, markerData.color, this.globalMarkerOpacity);
+                    markerData.textLabel.setIcon(newTextLabel);
+                }
+            });
+        });
+    }
 
     // Метод для поиска меток
     searchMarkers(searchTerm) {
@@ -1574,19 +1700,20 @@ class DayZMap {
             marker.text.toLowerCase().includes(this.searchFilter)
         );
 
+        this.isFilterActive = true;
         this.updateMarkersList();
         this.showSearchResults();
         
         // Показываем уведомление о количестве найденных меток
         if (this.filteredMarkers.length > 0) {
             this.showSuccess(`Найдено ${this.filteredMarkers.length} меток`);
+        } else {
+            this.showError('Метки не найдены');
         }
     }
 
     // Метод для показа результатов поиска
     showSearchResults() {
-        this.isFilterActive = this.searchFilter !== '';
-        
         // Сначала показываем все метки на карте
         this.markers.forEach(markerData => {
             markerData.marker.addTo(this.map);
@@ -1626,7 +1753,10 @@ class DayZMap {
         });
         
         this.updateMarkersList();
-        document.getElementById('searchMarkers').value = '';
+        const searchInput = document.getElementById('searchMarkers');
+        if (searchInput) {
+            searchInput.value = '';
+        }
     }
 
     // Метод для скрытия всех меток кроме найденных
@@ -1669,12 +1799,35 @@ class DayZMap {
     // Подготовка данных для экспорта в совместимом формате
     prepareExportData() {
         const servers = [{
-            name: "Exported Markers",
+            param1: "ip:port", // Пустой param1 как в оригинальном файле
             param2: this.markers.map(marker => {
-                // Преобразуем координаты обратно в игровой формат
+                // Если есть оригинальные данные, используем их КАК ЕСТЬ
+                if (marker.originalData) {
+                    // Обновляем только изменяемые поля
+                    const updatedData = { ...marker.originalData };
+                    updatedData.name = marker.text;
+                    updatedData.icon = this.getIconPathFromType(marker.type);
+                    
+                    // Обновляем координаты
+                    updatedData.position = [
+                        marker.gameCoords.x,
+                        marker.originalData.position ? marker.originalData.position[1] : 0, // Сохраняем оригинальную Z координату
+                        marker.gameCoords.y
+                    ];
+                    
+                    // Обновляем цвет если он изменился
+                    const colorComponents = this.parseColorToComponents(marker.color);
+                    updatedData.colorR = colorComponents.r;
+                    updatedData.colorG = colorComponents.g;
+                    updatedData.colorB = colorComponents.b;
+                    
+                    return updatedData;
+                }
+                
+                // Иначе создаем данные из текущего состояния метки
                 const x = marker.gameCoords.x;
                 const y = marker.gameCoords.y;
-                const z = 0; // Высота по умолчанию
+                const z = marker.gameCoords.z || 0; // Используем сохраненную Z координату
                 
                 // Получаем путь к иконке из типа метки
                 const iconPath = this.getIconPathFromType(marker.type);
@@ -1682,14 +1835,27 @@ class DayZMap {
                 // Преобразуем цвет из RGB в компоненты
                 const colorComponents = this.parseColorToComponents(marker.color);
                 
+                // Создаем объект с базовыми параметрами
                 return {
+                    type: 5,
+                    uid: marker.id,
                     name: marker.text,
-                    position: [x, z, y], // [x, z, y] - формат DayZ
                     icon: iconPath,
+                    position: [x, z, y], // [x, z, y] - формат DayZ
+                    currentSubgroup: 0,
+                    colorA: 255,
                     colorR: colorComponents.r,
                     colorG: colorComponents.g,
                     colorB: colorComponents.b,
-                    colorA: 255 // Альфа-канал по умолчанию
+                    creatorSteamID: "",
+                    circleRadius: 0.0,
+                    circleColorA: 255,
+                    circleColorR: 255,
+                    circleColorG: 255,
+                    circleColorB: 255,
+                    circleStriked: 0,
+                    circleLayer: 0,
+                    showAllPlayerNametags: 0
                 };
             })
         }];

@@ -339,3 +339,54 @@ body {
         min-width: auto;
     }
 }
+
+/* Блок с информацией о поддержке */
+.support-info {
+    background: #2d2d2d;
+    padding: 8px;
+    margin: 5px 0;
+    border-radius: 5px;
+    border: 1px solid #444;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.support-text {
+    color: #ecf0f1;
+    font-size: 0.85em;
+    font-weight: bold;
+}
+
+.support-links {
+    display: flex;
+    gap: 8px;
+}
+
+.telegram-link, .github-link {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    color: white;
+    text-decoration: none;
+    border-radius: 3px;
+    transition: background-color 0.3s;
+    font-size: 0.8em;
+}
+
+.telegram-link {
+    background: #0088cc;
+}
+
+.telegram-link:hover {
+    background: #0077b3;
+}
+
+.github-link {
+    background: #333;
+}
+
+.github-link:hover {
+    background: #555;
+}
