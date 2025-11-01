@@ -4,6 +4,10 @@
 
 ! Импорт и Экспорт подогнан под метки lbmaster (lbgroup)
 
+[Импорт меток](https://github.com/virtyzz/DayZLocalMap_Chernarusplus?tab=readme-ov-file#импорт-меток)
+
+[Экспорт меток](https://github.com/virtyzz/DayZLocalMap_Chernarusplus?tab=readme-ov-file#экспорт-меток)
+
 ## 🌟 Возможности
 
 ### Основные функции
