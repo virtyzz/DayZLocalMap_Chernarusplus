@@ -94,21 +94,39 @@ php -S localhost:8000
 ### Экспорт меток
 Метки экспортируются в JSON формате совместимом с DayZ:
 ```json
-{
-  "name": "Exported Markers",
-  "param2": [
-    {
-      "name": "Название метки",
-      "position": [1234, 0, 5678],
-      "icon": "LBmaster_Groups\\gui\\icons\\marker.paa",
-      "colorR": 255,
-      "colorG": 255,
-      "colorB": 255,
-      "colorA": 255
-    }
+[
+  {
+    "param1": "ip:port",
+    "param2": [
+      {
+        "type": 5,
+        "uid": 1761960985243,
+        "name": "2135zsfas",
+        "icon": "LBmaster_Groups\\gui\\icons\\blackmarket.paa",
+        "position": [
+          8700,
+          0,
+          5295
+        ],
+        "currentSubgroup": 0,
+        "colorA": 255,
+        "colorR": 125,
+        "colorG": 255,
+        "colorB": 0,
+        "creatorSteamID": "",
+        "circleRadius": 0,
+        "circleColorA": 255,
+        "circleColorR": 255,
+        "circleColorG": 255,
+        "circleColorB": 255,
+        "circleStriked": 0,
+        "circleLayer": 0,
+        "showAllPlayerNametags": 0
+      }
   ]
 }
 ```
+Не забудьте изменить строку "param1": "ip:port" и подставить туда актуальные значения сервера
 
 ### Импорт меток
 Поддерживается импорт меток из JSON файлов, экспортированных из DayZ или созданных вручную в совместимом формате.
