@@ -141,11 +141,13 @@ php -S localhost:8000
 
 Открываем скопированный PrivateMarkers.json, например в notepad++ (я буду использовать его в примерах)
 Для удобства нажмите на каждый минус напротив "param2" чтобы свернуть координаты меток и приведите файл к такому виду
+
 <img width="391" height="328" alt="image" src="https://github.com/user-attachments/assets/a5eb29c4-28ad-4edd-9fca-d2415e1dada4" />
 
 
 Мне в данном примере надо удалить метки сервера Dungeon 1, (его ip и порт 109.248.4.32:2218)
 я выделяю область от "{" и включительно до "}," внутри с param1 и param2 и удаляю (пример с серой областью на скриншоте)
+
 <img width="406" height="322" alt="image" src="https://github.com/user-attachments/assets/3e3baa36-8b92-4b43-a05a-79a8e378c8d3" />
 
 Сохраняем файл и можно импортировать.
