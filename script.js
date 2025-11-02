@@ -1212,19 +1212,18 @@ class DayZMap {
             className: `custom-marker marker-${type}`,
             html: `
                 <div style="
-                    background-color: ${color};
+                    background: none;
                     width: 32px;
                     height: 32px;
-                    border-radius: ${this.getMarkerShape(type)};
-                    border: 3px solid white;
-                    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+					border: none;
                     display: flex;
                     align-items: center;
                     justify-content: center;
-                    font-size: 14px;
-                    color: white;
+                    font-size: 20px;
+                    color: ${color};
                     font-weight: bold;
                     opacity: ${opacity};
+					text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
                 ">${markerType.symbol}</div>
             `,
             iconSize: [32, 32],
@@ -1239,14 +1238,14 @@ class DayZMap {
                 color: ${color}; 
                 background: none; 
                 padding: 2px 6px; 
-                font-size: 12px; 
+                font-size: 14px; 
                 white-space: nowrap;
-                margin-left: 20px;
+                margin-left: 8px;
                 font-weight: bold;
                 opacity: ${opacity};
             ">${text}</div>`,
             iconSize: [100, 20],
-            iconAnchor: [0, 10]
+            iconAnchor: [0, 12]
         });
     }
 
