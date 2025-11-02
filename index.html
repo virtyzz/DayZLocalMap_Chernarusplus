@@ -14,7 +14,13 @@
             <div class="controls">
                 <button id="addMarkerBtn">Добавить метку</button>
                 <button id="clearMarkersBtn">Очистить все метки</button>
-                <!-- Кнопки импорта/экспорта теперь добавляются через JS -->
+				<div class="control-separator"></div>
+				<div class="coord-inputs">
+                    <input type="number" id="coordX" placeholder="X" min="0" max="15360">
+                    <input type="number" id="coordY" placeholder="Y" min="0" max="15360">
+                    <button id="addMarkerByCoords">Добавить по координатам</button>
+                </div>
+				<div class="control-separator"></div>
             </div>
         </div>
         
@@ -25,10 +31,49 @@
         <div class="sidebar">
             <div class="markers-search">
                 <input type="text" id="searchMarkers" placeholder="Поиск меток по названию...">
+				<select id="searchType">
+					<option value="">Все типы</option>
+					<option value="default">Обычный маркер</option>
+					<option value="cross">X</option>
+					<option value="home">Дом</option>
+					<option value="camp">Лагерь</option>
+					<option value="safezone">Безопасная зона</option>
+					<option value="blackmarket">Черный рынок</option>
+					<option value="hospital">Госпиталь</option>
+					<option value="sniper">Снайпер</option>
+					<option value="player">Игрок</option>
+					<option value="flag">Флаг</option>
+					<option value="star">Звезда</option>
+					<option value="car">Автомобиль</option>
+					<option value="parking">Парковка</option>
+					<option value="heli">Вертолет</option>
+					<option value="rail">Железная дорога</option>
+					<option value="ship">Корабль</option>
+					<option value="scooter">Скутер</option>
+					<option value="bank">Банк</option>
+					<option value="restaurant">Ресторан</option>
+					<option value="post">Почта</option>
+					<option value="castle">Замок</option>
+					<option value="ranger-station">Станция рейнджера</option>
+					<option value="water">Вода</option>
+					<option value="triangle">Треугольник</option>
+					<option value="cow">Корова</option>
+					<option value="bear">Медведь</option>
+					<option value="car-repair">Ремонт авто</option>
+					<option value="communications">Коммуникации</option>
+					<option value="roadblock">Блокпост</option>
+					<option value="stadium">Стадион</option>
+					<option value="skull">Череп</option>
+					<option value="rocket">Ракета</option>
+					<option value="bbq">BBQ</option>
+					<option value="ping">Пинг</option>
+					<option value="circle">Круг</option>
+				</select>
                 <div class="search-buttons">
                     <button id="searchBtn">Поиск</button>
                     <button id="showAllBtn" style="display:none;">Показать все</button>
                     <button id="hideOthersBtn">Скрыть остальные</button>
+					<button id="exportFilteredBtn" style="display:none;">Экспорт найденных</button>
                 </div>
             </div>
             
