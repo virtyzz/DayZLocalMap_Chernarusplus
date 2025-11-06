@@ -483,6 +483,7 @@ class DayZMap {
 					// Автопоиск при изменении типа
 					if (this.searchFilter || searchTypeInput.value) {
 						this.performSearch();
+					this.updateSearchButtons();
 					}
 				});
 			}
@@ -1665,43 +1666,46 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
 
     // Метод для обновления состояния кнопок
     updateSearchButtons() {
-        const searchBtn = document.getElementById('searchBtn');
-        const showAllBtn = document.getElementById('showAllBtn');
-        const hideOthersBtn = document.getElementById('hideOthersBtn');
-        const exportFilteredBtn = document.getElementById('exportFilteredBtn');
+		const searchBtn = document.getElementById('searchBtn');
+		const showAllBtn = document.getElementById('showAllBtn');
+		const hideOthersBtn = document.getElementById('hideOthersBtn');
+		const exportFilteredBtn = document.getElementById('exportFilteredBtn');
 
-        if (!searchBtn || !showAllBtn || !hideOthersBtn || !exportFilteredBtn) return;
+		if (!searchBtn || !showAllBtn || !hideOthersBtn || !exportFilteredBtn) return;
 
-        if (this.isFilterActive && this.searchFilter) {
-            searchBtn.textContent = 'Отменить';
-            searchBtn.style.background = '#e74c3c';
-            showAllBtn.style.display = 'inline-block';
-            exportFilteredBtn.style.display = 'inline-block';
-            hideOthersBtn.disabled = this.filteredMarkers.length === 0;
-            exportFilteredBtn.disabled = this.filteredMarkers.length === 0;
-            
-            if (this.filteredMarkers.length === 0) {
-                hideOthersBtn.title = 'Нет найденных меток для отображения';
-                exportFilteredBtn.title = 'Нет найденных меток для экспорта';
-            } else {
-                hideOthersBtn.title = '';
-                exportFilteredBtn.title = `Экспортировать ${this.filteredMarkers.length} найденных меток`;
-            }
-        } else {
-            searchBtn.textContent = 'Поиск';
-            searchBtn.style.background = '#3498db';
-            showAllBtn.style.display = 'none';
-            exportFilteredBtn.style.display = 'none';
-            hideOthersBtn.disabled = true;
-            exportFilteredBtn.disabled = true;
-            hideOthersBtn.title = 'Сначала выполните поиск';
-            exportFilteredBtn.title = 'Сначала выполните поиск';
-        }
-        
-        // Обновляем состояние кнопок в зависимости от наличия результатов
-        hideOthersBtn.disabled = !this.isFilterActive || this.filteredMarkers.length === 0;
-        exportFilteredBtn.disabled = !this.isFilterActive || this.filteredMarkers.length === 0;
-    }
+		const searchType = document.getElementById('searchType').value;
+		const hasActiveFilter = this.searchFilter || searchType;
+
+		if (hasActiveFilter) {
+			searchBtn.textContent = 'Отменить';
+			searchBtn.style.background = '#e74c3c';
+			showAllBtn.style.display = 'inline-block';
+			exportFilteredBtn.style.display = 'inline-block';
+			hideOthersBtn.disabled = this.filteredMarkers.length === 0;
+			exportFilteredBtn.disabled = this.filteredMarkers.length === 0;
+			
+			if (this.filteredMarkers.length === 0) {
+				hideOthersBtn.title = 'Нет найденных меток для отображения';
+				exportFilteredBtn.title = 'Нет найденных меток для экспорта';
+			} else {
+				hideOthersBtn.title = '';
+				exportFilteredBtn.title = `Экспортировать ${this.filteredMarkers.length} найденных меток`;
+			}
+		} else {
+			searchBtn.textContent = 'Поиск';
+			searchBtn.style.background = '#3498db';
+			showAllBtn.style.display = 'none';
+			exportFilteredBtn.style.display = 'none';
+			hideOthersBtn.disabled = true;
+			exportFilteredBtn.disabled = true;
+			hideOthersBtn.title = 'Сначала выполните поиск';
+			exportFilteredBtn.title = 'Сначала выполните поиск';
+		}
+		
+		// Обновляем состояние кнопок в зависимости от наличия результатов
+		hideOthersBtn.disabled = !hasActiveFilter || this.filteredMarkers.length === 0;
+		exportFilteredBtn.disabled = !hasActiveFilter || this.filteredMarkers.length === 0;
+	}
 	
 	// Метод для экспорта фильтрованных меток
     exportFilteredMarkers() {
@@ -2130,6 +2134,8 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
 		this.updateMarkersList();
 		this.showSearchResults();
 		
+		this.updateSearchButtons();
+		
 		// Показываем уведомление о количестве найденных меток
 		if (this.filteredMarkers.length > 0) {
 			let message = `Найдено ${this.filteredMarkers.length} меток`;
@@ -2177,26 +2183,28 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
 
     // Метод для очистки поиска
     clearSearch() {
-        this.searchFilter = '';
-        this.filteredMarkers = [];
-        this.isFilterActive = false;
-        
-        // Сбрасываем поля поиска
-        const searchInput = document.getElementById('searchMarkers');
-        const searchType = document.getElementById('searchType');
-        if (searchInput) searchInput.value = '';
-        if (searchType) searchType.value = '';
-        
-        // Показываем все метки на карте
-        this.markers.forEach(markerData => {
-            markerData.marker.addTo(this.map);
-            if (markerData.textLabel) {
-                markerData.textLabel.addTo(this.map);
-            }
-        });
-        
-        this.updateMarkersList();
-    }
+		this.searchFilter = '';
+		this.filteredMarkers = [];
+		this.isFilterActive = false;
+		
+		// Сбрасываем поля поиска
+		const searchInput = document.getElementById('searchMarkers');
+		const searchType = document.getElementById('searchType');
+		if (searchInput) searchInput.value = '';
+		if (searchType) searchType.value = '';
+		
+		// Показываем все метки на карте
+		this.markers.forEach(markerData => {
+			markerData.marker.addTo(this.map);
+			if (markerData.textLabel) {
+				markerData.textLabel.addTo(this.map);
+			}
+		});
+		
+		this.updateMarkersList();
+		// ОБНОВЛЯЕМ КНОПКИ ПОСЛЕ ОЧИСТКИ
+		this.updateSearchButtons();
+	}
 
     // Метод для скрытия всех меток кроме найденных
     hideOtherMarkers() {
