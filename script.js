@@ -183,7 +183,7 @@ class DayZMap {
     getTileFileName(x, y) {
         const formattedX = this.formatTileNumber(x);
         const formattedY = this.formatTileNumber(y);
-        return `S_${formattedX}_${formattedY}_lco.png`;
+        return `S_${formattedX}_${formattedY}_lco.webp`;
     }
 
     tileToLeafletBounds(tileX, tileY) {
