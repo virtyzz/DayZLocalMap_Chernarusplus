@@ -267,60 +267,6 @@ class DayZMap {
 	}
 	
     async loadTiles() {
-		if (!CONFIG.lazyLoading.enabled) {
-			console.log('=== АДАПТИВНАЯ ЗАГРУЗКА ТАЙЛОВ ===');
-			
-			const currentZoom = this.map.getZoom();
-			const tileSet = this.getCurrentTileSet(currentZoom);
-			const config = CONFIG.tileSets[tileSet];
-			
-			console.log(`Текущий зум: ${currentZoom}, используем набор: ${tileSet}, сетка: ${config.gridSize}x${config.gridSize}`);
-			
-			const tilePromises = [];
-			let loadedCount = 0;
-			let errorCount = 0;
-			
-			// Показываем индикатор загрузки
-			this.showLoadingIndicator(`Загрузка ${tileSet} тайлов...`);
-			
-			// Очищаем старые тайлы
-			this.clearExistingTiles();
-			
-			// Загружаем тайлы для текущего набора
-			for (let x = 0; x < config.gridSize; x++) {
-				for (let y = 0; y < config.gridSize; y++) {
-					const tileFileName = this.getTileFileName(x, y, tileSet);
-					const tileUrl = `${config.folder}/${tileFileName}`;
-					const bounds = this.tileToLeafletBounds(x, y, tileSet);
-					
-					tilePromises.push(
-						this.loadTileImage(tileUrl, bounds, x, y, tileSet)
-							.then(() => {
-								loadedCount++;
-								const totalTiles = config.gridSize * config.gridSize;
-								this.updateLoadingProgress(loadedCount, totalTiles, tileSet);
-								return { success: true, tile: tileFileName, set: tileSet };
-							})
-							.catch((error) => {
-								errorCount++;
-								console.error(`❌ Ошибка загрузки (${tileSet}): ${tileFileName}`, error.message);
-								return { success: false, tile: tileFileName, error: error.message, set: tileSet };
-							})
-					);
-				}
-			}
-
-			try {
-				const results = await Promise.allSettled(tilePromises);
-				this.processTileLoadResults(results, tileSet);
-			} catch (error) {
-				console.error('Ошибка при загрузке тайлов:', error);
-				this.showError('Критическая ошибка при загрузке карты');
-			} finally {
-				this.hideLoadingIndicator();
-			}
-			return this.loadAllTiles();
-		}
 		return this.loadVisibleTiles();
 	}
 	
@@ -949,19 +895,6 @@ class DayZMap {
 					this.updateMarkersList();
 				}
 			});
-			
-			// Кнопка переключения режима загрузки
-			const lazyToggleBtn = document.createElement('button');
-				lazyToggleBtn.textContent = 'Ленивая загрузка: ВКЛ';
-				lazyToggleBtn.addEventListener('click', () => {
-					CONFIG.lazyLoading.enabled = !CONFIG.lazyLoading.enabled;
-					lazyToggleBtn.textContent = `Ленивая загрузка: ${CONFIG.lazyLoading.enabled ? 'ВКЛ' : 'ВЫКЛ'}`;
-					
-					this.clearAllTiles();
-					this.loadTiles();
-				});
-				document.querySelector('.controls').appendChild(lazyToggleBtn);
-			//*************************************
 			
         } catch (error) {
             console.error('Ошибка при привязке событий:', error);
