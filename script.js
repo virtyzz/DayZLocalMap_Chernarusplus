@@ -7,7 +7,42 @@ const CONFIG = {
     maxTilesX: 31,
     maxTilesY: 31,
     mapPixelWidth: 15360,
-    mapPixelHeight: 15360
+    mapPixelHeight: 15360,
+
+    // Конфигурация для разных уровней тайлов
+    tileSets: {
+        high: {
+            folder: 'tiles_cropped',
+            prefix: 'S',
+            format: 3,
+            gridSize: 32,
+            zoomLevels: [10, 11, 12],
+            scale: 1
+        },
+        medium: {
+            folder: 'tiles_medium',
+            prefix: 'L',
+            format: 2,
+            gridSize: 16,
+            zoomLevels: [7, 8, 9],
+            scale: 2
+        },
+        low: {
+            folder: 'tiles_low',
+            prefix: 'L',
+            format: 2,
+            gridSize: 8,
+            zoomLevels: [5, 6],
+            scale: 4
+        }
+    },
+
+    // Конфигурация ленивой загрузки
+    lazyLoading: {
+        enabled: true,
+        buffer: 1,
+        throttleDelay: 250
+    }
 };
 
 // Константы для типов меток
@@ -69,6 +104,13 @@ class DayZMap {
             color: '#3498db'
         };
         this.modalCloseHandlers = new Map(); // Для управления обработчиками модальных окон
+		this.lastTileSet = 'high';
+		this.loadedTiles = new Set(); // отслеживаем загруженные тайлы
+		this.lastLoadBounds = null; // последняя загруженная область
+		this.loadThrottle = null; // для троттлинга
+		this.currentTileLayers = new Map(); // храним ссылки на загруженные тайлы
+		this.markersLoaded = false;
+		this.gridLoaded = false;
         this.init();
     }
 
@@ -140,37 +182,42 @@ class DayZMap {
     }
 
     initMap() {
-        console.log('Создание карты Leaflet...');
-        
-        // Проверяем существование элемента карты
-        if (!document.getElementById('map')) {
-            console.error('Element #map not found');
-            this.showError('Элемент карты не найден на странице');
-            return;
-        }
+		console.log('Создание карты Leaflet...');
+		
+		if (!document.getElementById('map')) {
+			console.error('Element #map not found');
+			this.showError('Элемент карты не найден на странице');
+			return;
+		}
 
-        this.map = L.map('map', {
-            crs: L.CRS.Simple,
-            minZoom: CONFIG.minZoom,
-            maxZoom: CONFIG.maxZoom,
-			zoomSnap: 0.5,      // Шаг зума 0.5
-			zoomDelta: 0.5,     // Изменение зума за шаг
-			wheelPxPerZoomLevel: 100, // Чувствительность колесика мыши
-            attributionControl: false
-        });
+		this.map = L.map('map', {
+			crs: L.CRS.Simple,
+			minZoom: CONFIG.minZoom,
+			maxZoom: CONFIG.maxZoom,
+			zoomSnap: 0.5,
+			zoomDelta: 0.5,
+			wheelPxPerZoomLevel: 100,
+			attributionControl: false
+		});
 
-        const bounds = new L.LatLngBounds(
-            [0, 0],
-            [32, 32]
-        );
-        this.map.setMaxBounds(bounds);
-        
-        const center = [16, 16];
-        this.map.setView(center, CONFIG.initialZoom);
-        
-        console.log('Карта инициализирована');
-        this.loadTiles();
-    }
+		const bounds = new L.LatLngBounds(
+			[0, 0],
+			[32, 32]
+		);
+		this.map.setMaxBounds(bounds);
+		
+		const center = [16, 16];
+		this.map.setView(center, CONFIG.initialZoom);
+		
+		console.log('Карта инициализирована');
+		
+		// Загружаем тайлы
+		this.loadTiles();
+		
+		// Загружаем маркеры и сетку независимо от тайлов
+		this.loadMarkers();
+		this.addGrid();
+	}
 
     formatTileNumber(num) {
         return num.toString().padStart(3, '0');
@@ -180,110 +227,369 @@ class DayZMap {
         return Math.round(num / 100).toString().padStart(3, '0');
     }
 
-    getTileFileName(x, y) {
-        const formattedX = this.formatTileNumber(x);
-        const formattedY = this.formatTileNumber(y);
-        return `S_${formattedX}_${formattedY}_lco.webp`;
-    }
+    getTileFileName(x, y, tileSet = 'high') {
+		const config = CONFIG.tileSets[tileSet];
+		const formattedX = x.toString().padStart(config.format, '0');
+		const formattedY = y.toString().padStart(config.format, '0');
+		return `${config.prefix}_${formattedX}_${formattedY}_lco.webp`;
+	}
 
-    tileToLeafletBounds(tileX, tileY) {
-        const left = tileX;
-        const right = tileX + 1;
-        const top = 31 - tileY;
-        const bottom = top + 1;
-        
-        return new L.LatLngBounds(
-            [bottom, left],
-            [top, right]
-        );
-    }
+    tileToLeafletBounds(tileX, tileY, tileSet = 'high') {
+		const config = CONFIG.tileSets[tileSet];
+		const gridSize = config.gridSize;
+		
+		// Нормализуем координаты для Leaflet (0-32)
+		const tileWidth = 32 / gridSize;
+		const tileHeight = 32 / gridSize;
+		
+		const left = tileX * tileWidth;
+		const right = (tileX + 1) * tileWidth;
+		const top = (gridSize - tileY - 1) * tileHeight; // Инвертируем Y
+		const bottom = (gridSize - tileY) * tileHeight;
+		
+		return new L.LatLngBounds(
+			[bottom, left],
+			[top, right]
+		);
+	}
 
+	//метод для определения текущего набора тайлов
+	getCurrentTileSet(zoom) {
+		for (const [setName, config] of Object.entries(CONFIG.tileSets)) {
+			if (config.zoomLevels.includes(zoom)) {
+				return setName;
+			}
+		}
+		// Если зум выходит за пределы настроенных уровней, используем ближайший
+		if (zoom < 7) return 'low';
+		if (zoom < 10) return 'medium';
+		return 'high';
+	}
+	
     async loadTiles() {
-        console.log('=== НАЧАЛО ЗАГРУЗКИ ТАЙЛОВ ===');
+		if (!CONFIG.lazyLoading.enabled) {
+			console.log('=== АДАПТИВНАЯ ЗАГРУЗКА ТАЙЛОВ ===');
+			
+			const currentZoom = this.map.getZoom();
+			const tileSet = this.getCurrentTileSet(currentZoom);
+			const config = CONFIG.tileSets[tileSet];
+			
+			console.log(`Текущий зум: ${currentZoom}, используем набор: ${tileSet}, сетка: ${config.gridSize}x${config.gridSize}`);
+			
+			const tilePromises = [];
+			let loadedCount = 0;
+			let errorCount = 0;
+			
+			// Показываем индикатор загрузки
+			this.showLoadingIndicator(`Загрузка ${tileSet} тайлов...`);
+			
+			// Очищаем старые тайлы
+			this.clearExistingTiles();
+			
+			// Загружаем тайлы для текущего набора
+			for (let x = 0; x < config.gridSize; x++) {
+				for (let y = 0; y < config.gridSize; y++) {
+					const tileFileName = this.getTileFileName(x, y, tileSet);
+					const tileUrl = `${config.folder}/${tileFileName}`;
+					const bounds = this.tileToLeafletBounds(x, y, tileSet);
+					
+					tilePromises.push(
+						this.loadTileImage(tileUrl, bounds, x, y, tileSet)
+							.then(() => {
+								loadedCount++;
+								const totalTiles = config.gridSize * config.gridSize;
+								this.updateLoadingProgress(loadedCount, totalTiles, tileSet);
+								return { success: true, tile: tileFileName, set: tileSet };
+							})
+							.catch((error) => {
+								errorCount++;
+								console.error(`❌ Ошибка загрузки (${tileSet}): ${tileFileName}`, error.message);
+								return { success: false, tile: tileFileName, error: error.message, set: tileSet };
+							})
+					);
+				}
+			}
+
+			try {
+				const results = await Promise.allSettled(tilePromises);
+				this.processTileLoadResults(results, tileSet);
+			} catch (error) {
+				console.error('Ошибка при загрузке тайлов:', error);
+				this.showError('Критическая ошибка при загрузке карты');
+			} finally {
+				this.hideLoadingIndicator();
+			}
+			return this.loadAllTiles();
+		}
+		return this.loadVisibleTiles();
+	}
+	
+	async loadVisibleTiles() {
+        const currentZoom = this.map.getZoom();
+        const tileSet = this.getCurrentTileSet(currentZoom);
+        const config = CONFIG.tileSets[tileSet];
         
-        const tilePromises = [];
+        const bounds = this.map.getBounds();
+        const pixelBounds = this.getVisibleTileBounds(bounds, config.gridSize);
         
-        for (let x = 0; x <= CONFIG.maxTilesX; x++) {
-            for (let y = 0; y <= CONFIG.maxTilesY; y++) {
-                const tileFileName = this.getTileFileName(x, y);
-                const tileUrl = `tiles_cropped/${tileFileName}`;
-                const bounds = this.tileToLeafletBounds(x, y);
+        if (this.shouldReloadTiles(pixelBounds)) {
+            console.log(`Загрузка видимых тайлов (${tileSet}): ${pixelBounds.minX}-${pixelBounds.maxX}, ${pixelBounds.minY}-${pixelBounds.maxY}`);
+            
+            await this.loadTilesInBounds(pixelBounds, tileSet);
+            this.lastLoadBounds = pixelBounds;
+        }
+    }
+
+	getVisibleTileBounds(bounds, gridSize) {
+        const southWest = bounds.getSouthWest();
+        const northEast = bounds.getNorthEast();
+        
+        const minX = Math.max(0, Math.floor(southWest.lng / 32 * gridSize));
+        const maxX = Math.min(gridSize - 1, Math.floor(northEast.lng / 32 * gridSize));
+        const minY = Math.max(0, Math.floor((32 - northEast.lat) / 32 * gridSize));
+        const maxY = Math.min(gridSize - 1, Math.floor((32 - southWest.lat) / 32 * gridSize));
+        
+        const buffer = CONFIG.lazyLoading.buffer;
+        return {
+            minX: Math.max(0, minX - buffer),
+            maxX: Math.min(gridSize - 1, maxX + buffer),
+            minY: Math.max(0, minY - buffer),
+            maxY: Math.min(gridSize - 1, maxY + buffer),
+            gridSize: gridSize
+        };
+    }
+
+	shouldReloadTiles(newBounds) {
+        if (!this.lastLoadBounds) return true;
+        
+        return Math.abs(newBounds.minX - this.lastLoadBounds.minX) > 1 ||
+               Math.abs(newBounds.maxX - this.lastLoadBounds.maxX) > 1 ||
+               Math.abs(newBounds.minY - this.lastLoadBounds.minY) > 1 ||
+               Math.abs(newBounds.maxY - this.lastLoadBounds.maxY) > 1;
+    }
+	
+	//загрузка тайлов в области
+	async loadTilesInBounds(bounds, tileSet) {
+        const config = CONFIG.tileSets[tileSet];
+        const promises = [];
+        
+        const tilesToLoad = [];
+        for (let x = bounds.minX; x <= bounds.maxX; x++) {
+            for (let y = bounds.minY; y <= bounds.maxY; y++) {
+                const tileKey = `${tileSet}_${x}_${y}`;
                 
-                tilePromises.push(
-                    this.loadTileImage(tileUrl, bounds, x, y)
-                        .then(() => {
-                            console.log(`✅ Тайл загружен: ${tileFileName}`);
-                            return { success: true, tile: tileFileName };
-                        })
-                        .catch((error) => {
-                            console.error(`❌ Ошибка загрузки: ${tileFileName}`, error.message);
-                            return { success: false, tile: tileFileName, error: error.message };
-                        })
-                );
+                if (!this.loadedTiles.has(tileKey)) {
+                    tilesToLoad.push({ x, y, key: tileKey });
+                }
             }
         }
-
-        try {
-            const results = await Promise.allSettled(tilePromises);
-            this.processTileLoadResults(results);
-        } catch (error) {
-            console.error('Ошибка при загрузке тайлов:', error);
-            this.showError('Критическая ошибка при загрузке карты');
+        
+        if (tilesToLoad.length === 0) {
+            console.log('Все видимые тайлы уже загружены');
+            return;
+        }
+        
+        console.log(`Загружаем ${tilesToLoad.length} новых тайлов`);
+        
+        for (const tile of tilesToLoad) {
+            const promise = this.loadSingleTile(tile.x, tile.y, tileSet)
+                .then(layer => {
+                    if (layer) {
+                        this.loadedTiles.add(tile.key);
+                        this.currentTileLayers.set(tile.key, layer);
+                    }
+                    return { success: true, tile: tile.key };
+                })
+                .catch(error => {
+                    console.error(`Ошибка загрузки тайла ${tile.key}:`, error);
+                    return { success: false, tile: tile.key, error: error.message };
+                });
+            
+            promises.push(promise);
+        }
+        
+        this.unloadOutOfBoundsTiles(bounds, tileSet);
+        
+        const results = await Promise.allSettled(promises);
+        const loaded = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
+        const errors = results.length - loaded;
+        
+        if (errors > 0) {
+            console.warn(`Загружено ${loaded} тайлов, ошибок: ${errors}`);
         }
     }
-
-    loadTileImage(url, bounds, x, y) {
+	
+	//загрузка одного тайла
+	loadSingleTile(x, y, tileSet) {
         return new Promise((resolve, reject) => {
-            const testImg = new Image();
+            const config = CONFIG.tileSets[tileSet];
+            const fileName = this.getTileFileName(x, y, tileSet);
+            const url = `${config.folder}/${fileName}`;
+            const bounds = this.tileToLeafletBounds(x, y, tileSet);
+            
+            const img = new Image();
             let timeoutId;
             
-            testImg.onload = () => {
+            img.onload = () => {
                 clearTimeout(timeoutId);
                 try {
-                    L.imageOverlay(url, bounds).addTo(this.map);
-                    resolve();
+                    const layer = L.imageOverlay(url, bounds).addTo(this.map);
+                    resolve(layer);
                 } catch (error) {
                     reject(error);
                 }
             };
             
-            testImg.onerror = () => {
+            img.onerror = () => {
                 clearTimeout(timeoutId);
-                reject(new Error('Файл не найден или ошибка загрузки'));
+                reject(new Error(`Не удалось загрузить: ${fileName}`));
             };
             
-            testImg.src = url;
+            img.src = url;
             
-            // Увеличиваем таймаут для медленных соединений
             timeoutId = setTimeout(() => {
-                if (!testImg.complete) {
-                    reject(new Error('Таймаут загрузки'));
-                }
-            }, 10000); // 10 секунд
+                reject(new Error(`Таймаут загрузки: ${fileName}`));
+            }, 10000);
         });
     }
-
-    processTileLoadResults(results) {
-        const loaded = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
-        const errors = results.length - loaded;
-        const total = results.length;
+	
+	//выгрузка невидимых тайлов
+	unloadOutOfBoundsTiles(currentBounds, tileSet) {
+        const tilesToRemove = [];
         
-        console.log(`=== ИТОГ ЗАГРУЗКИ: ${loaded} успешно, ${errors} ошибок ===`);
-        
-        if (loaded === 0) {
-            this.showError('Не загружено ни одного тайла! Проверьте папку tiles_cropped');
-        } else {
-            console.log('Карта успешно загружена!');
-            this.loadMarkers();
-            this.addGrid();
+        for (const tileKey of this.loadedTiles) {
+            if (!tileKey.startsWith(tileSet + '_')) continue;
             
-            if (errors > 0) {
-                this.showSuccess(`Загружено ${loaded} тайлов, ${errors} ошибок`);
-            } else {
-                this.showSuccess(`Все ${loaded} тайлов успешно загружены!`);
+            const [_, x, y] = tileKey.split('_').map(Number);
+            
+            if (x < currentBounds.minX || x > currentBounds.maxX || 
+                y < currentBounds.minY || y > currentBounds.maxY) {
+                tilesToRemove.push(tileKey);
             }
         }
+        
+        tilesToRemove.forEach(tileKey => {
+            const layer = this.currentTileLayers.get(tileKey);
+            if (layer) {
+                this.map.removeLayer(layer);
+                this.currentTileLayers.delete(tileKey);
+            }
+            this.loadedTiles.delete(tileKey);
+        });
+        
+        if (tilesToRemove.length > 0) {
+            console.log(`Выгружено ${tilesToRemove.length} тайлов вне видимой области`);
+        }
     }
+	
+	clearExistingTiles() {
+		// Удаляем все ImageOverlay слои (тайлы)
+		this.map.eachLayer(layer => {
+			if (layer instanceof L.ImageOverlay) {
+				this.map.removeLayer(layer);
+			}
+		});
+	}
+	
+	showLoadingIndicator(message) {
+		// Удаляем старый индикатор если есть
+		this.hideLoadingIndicator();
+		
+		const loadingDiv = document.createElement('div');
+		loadingDiv.id = 'tileLoadingIndicator';
+		loadingDiv.style.cssText = `
+			position: absolute;
+			top: 50%;
+			left: 50%;
+			transform: translate(-50%, -50%);
+			background: rgba(0,0,0,0.9);
+			color: white;
+			padding: 20px;
+			border-radius: 8px;
+			z-index: 1000;
+			text-align: center;
+			border: 2px solid #3498db;
+			min-width: 300px;
+		`;
+		
+		loadingDiv.innerHTML = `
+			<div style="margin-bottom: 10px;">
+				<div style="font-size: 16px; font-weight: bold; margin-bottom: 5px;">${message}</div>
+				<div id="tileLoadingProgress" style="font-size: 12px; color: #bdc3c7;">Загрузка...</div>
+			</div>
+			<div style="width: 100%; height: 4px; background: #34495e; border-radius: 2px; overflow: hidden;">
+				<div id="tileLoadingBar" style="width: 0%; height: 100%; background: #3498db; transition: width 0.3s;"></div>
+			</div>
+		`;
+		
+		document.getElementById('map').appendChild(loadingDiv);
+		this.loadingIndicator = loadingDiv;
+	}
+
+	updateLoadingProgress(loaded, totalTiles, tileSet) {
+		const percent = Math.round((loaded / totalTiles) * 100);
+		
+		const progressElement = document.getElementById('tileLoadingProgress');
+		const barElement = document.getElementById('tileLoadingBar');
+		
+		if (progressElement && barElement) {
+			progressElement.textContent = `${loaded}/${totalTiles} тайлов (${percent}%) - ${tileSet}`;
+			barElement.style.width = `${percent}%`;
+		}
+	}
+
+	hideLoadingIndicator() {
+		if (this.loadingIndicator && this.loadingIndicator.parentNode) {
+			this.loadingIndicator.parentNode.removeChild(this.loadingIndicator);
+		}
+	}
+
+    loadTileImage(url, bounds, x, y, tileSet = 'high') {
+		return new Promise((resolve, reject) => {
+			const testImg = new Image();
+			let timeoutId;
+			
+			testImg.onload = () => {
+				clearTimeout(timeoutId);
+				try {
+					L.imageOverlay(url, bounds).addTo(this.map);
+					resolve();
+				} catch (error) {
+					reject(error);
+				}
+			};
+			
+			testImg.onerror = () => {
+				clearTimeout(timeoutId);
+				reject(new Error('Файл не найден или ошибка загрузки'));
+			};
+			
+			testImg.src = url;
+			
+			timeoutId = setTimeout(() => {
+				if (!testImg.complete) {
+					reject(new Error('Таймаут загрузки'));
+				}
+			}, 15000); // Увеличиваем таймаут до 15 секунд
+		});
+	}
+
+    processTileLoadResults(results, tileSet) {
+		const loaded = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
+		const errors = results.length - loaded;
+		
+		console.log(`=== ИТОГ ЗАГРУЗКИ (${tileSet}): ${loaded} успешно, ${errors} ошибок ===`);
+		
+		if (loaded === 0) {
+			this.showError(`Не загружено ни одного тайла в наборе ${tileSet}!`);
+		} else {
+			if (errors > 0) {
+				console.warn(`Загружено ${loaded} тайлов (${tileSet}), ${errors} ошибок`);
+			} else {
+				console.log(`Все ${loaded} тайлов (${tileSet}) успешно загружены!`);
+			}
+		}
+	}
 
     leafletToGameCoords(leafletLatLng) {
         const gameX = (leafletLatLng.lng / 32) * 15360;
@@ -528,13 +834,6 @@ class DayZMap {
                 this.showCoordinates(gameCoords);
             });
 
-            this.map.on('zoomend', () => {
-                if (this.gridEnabled) {
-                    this.updateGrid();
-					this.updateAxes();
-                }
-            });
-
             this.map.on('moveend', () => {
                 if (this.gridEnabled) {
                     this.updateAxes();
@@ -609,10 +908,115 @@ class DayZMap {
                     this.exportFilteredMarkers();
                 });
             }
+			
+			// Обработчик движения карты с троттлингом
+			this.map.on('move', () => {
+				if (CONFIG.lazyLoading.enabled) {
+					clearTimeout(this.loadThrottle);
+					this.loadThrottle = setTimeout(() => {
+						this.loadTiles();
+					}, CONFIG.lazyLoading.throttleDelay);
+				}
+			});
 
+			// Обработчик зума
+			this.map.on('zoomend', () => {
+				console.log('Zoom changed to:', this.map.getZoom());
+				
+				// 1. Обновляем сетку и оси (если сетка включена)
+				if (this.gridEnabled) {
+					this.updateGrid();
+					this.updateAxes();
+				}
+				
+				const newZoom = this.map.getZoom();
+				const currentTileSet = this.getCurrentTileSet(newZoom);
+				
+				// 2. Проверяем смену набора тайлов
+				if (this.lastTileSet !== currentTileSet) {
+					console.log(`Переключение с ${this.lastTileSet} на ${currentTileSet} тайлы`);
+					this.clearAllTiles();
+					this.lastTileSet = currentTileSet;
+				}
+				
+				// 3. Загружаем тайлы для новой области (если ленивая загрузка включена)
+				if (CONFIG.lazyLoading.enabled) {
+					this.loadTiles();
+				}
+				
+				// 4. Обновляем поиск если он активен (дополнительная логика если нужна)
+				if (this.isFilterActive) {
+					this.updateMarkersList();
+				}
+			});
+			
+			// Кнопка переключения режима загрузки
+			const lazyToggleBtn = document.createElement('button');
+				lazyToggleBtn.textContent = 'Ленивая загрузка: ВКЛ';
+				lazyToggleBtn.addEventListener('click', () => {
+					CONFIG.lazyLoading.enabled = !CONFIG.lazyLoading.enabled;
+					lazyToggleBtn.textContent = `Ленивая загрузка: ${CONFIG.lazyLoading.enabled ? 'ВКЛ' : 'ВЫКЛ'}`;
+					
+					this.clearAllTiles();
+					this.loadTiles();
+				});
+				document.querySelector('.controls').appendChild(lazyToggleBtn);
+			//*************************************
+			
         } catch (error) {
             console.error('Ошибка при привязке событий:', error);
         }
+    }
+	
+	//для просмотра статистики
+	getTileStats() {
+        return {
+            loaded: this.loadedTiles.size,
+            visible: this.currentTileLayers.size,
+            lastBounds: this.lastLoadBounds
+        };
+    }
+	// в консоли dayzMap.getTileStats() // посмотреть статистику загрузки
+	
+	clearAllTiles() {
+        this.currentTileLayers.forEach(layer => {
+            this.map.removeLayer(layer);
+        });
+        
+        this.loadedTiles.clear();
+        this.currentTileLayers.clear();
+        this.lastLoadBounds = null;
+    }
+	
+	async loadAllTiles() {
+        console.log('Полная загрузка всех тайлов...');
+        
+        const currentZoom = this.map.getZoom();
+        const tileSet = this.getCurrentTileSet(currentZoom);
+        const config = CONFIG.tileSets[tileSet];
+        
+        this.clearAllTiles();
+        
+        const promises = [];
+        for (let x = 0; x < config.gridSize; x++) {
+            for (let y = 0; y < config.gridSize; y++) {
+                const tileKey = `${tileSet}_${x}_${y}`;
+                const promise = this.loadSingleTile(x, y, tileSet)
+                    .then(layer => {
+                        this.loadedTiles.add(tileKey);
+                        this.currentTileLayers.set(tileKey, layer);
+                        return { success: true, tile: tileKey };
+                    })
+                    .catch(error => {
+                        return { success: false, tile: tileKey, error: error.message };
+                    });
+                promises.push(promise);
+            }
+        }
+        
+        const results = await Promise.allSettled(promises);
+        const loaded = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
+        console.log(`Полная загрузка завершена: ${loaded} тайлов`);
     }
 	
 	// Метод для преобразования игровых координат в Leaflet координаты
@@ -672,15 +1076,22 @@ class DayZMap {
     }
 
     addGrid() {
-        this.removeGrid();
-        if (!this.gridEnabled) return;
+		// Если сетка уже добавлена, не добавляем повторно
+		if (this.gridLoaded) {
+			return;
+		}
+		
+		this.removeGrid();
+		if (!this.gridEnabled) return;
 
-        this.gridLayer = L.layerGroup().addTo(this.map);
-        this.axisLayer = L.layerGroup().addTo(this.map);
+		this.gridLayer = L.layerGroup().addTo(this.map);
+		this.axisLayer = L.layerGroup().addTo(this.map);
 
-        this.drawGrid();
-        this.updateAxes();
-    }
+		this.drawGrid();
+		this.updateAxes();
+		
+		this.gridLoaded = true;
+	}
 
     updateGrid() {
         if (this.gridLayer) {
@@ -1823,13 +2234,12 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
 		if (saved) {
 			try {
 				const data = JSON.parse(saved);
-				console.log('Загружаемые данные:', data); // Отладочная информация
+				console.log('Загружаемые данные маркеров:', data);
 				
 				// Загружаем настройки
 				if (data.settings) {
 					this.globalMarkerOpacity = data.settings.globalOpacity || 0.8;
 					
-					// Загружаем последние параметры если есть
 					if (data.settings.lastMarkerParams) {
 						this.lastMarkerParams = data.settings.lastMarkerParams;
 					}
@@ -1844,8 +2254,8 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
 					}
 				}
 				
-				// Загружаем метки
-				if (data.markers) {
+				// Загружаем метки только если они еще не загружены
+				if (data.markers && !this.markersLoaded) {
 					// Очищаем текущие метки
 					this.markers.forEach(markerData => {
 						this.map.removeLayer(markerData.marker);
@@ -1862,7 +2272,6 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
 						);
 						
 						const color = savedMarkerData.color || this.getMarkerColor(savedMarkerData.type);
-						// Используем глобальную прозрачность при загрузке
 						const icon = this.createMarkerIcon(savedMarkerData.type, color, this.globalMarkerOpacity);
 
 						const marker = L.marker(leafletLatLng, { icon: icon })
@@ -1880,9 +2289,8 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
 							interactive: false
 						}).addTo(this.map);
 
-						// ВАЖНО: Сохраняем ВСЕ данные из сохраненного объекта
 						const markerData = {
-							...savedMarkerData, // Сохраняем все свойства из localStorage
+							...savedMarkerData,
 							leafletLatLng: leafletLatLng,
 							color: color,
 							marker: marker,
@@ -1895,7 +2303,10 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
 
 						this.markers.push(markerData);
 					});
+					
+					this.markersLoaded = true;
 					this.updateMarkersList();
+					console.log(`Загружено ${this.markers.length} маркеров`);
 				}
 			} catch (e) {
 				console.error('Ошибка загрузки меток:', e);
