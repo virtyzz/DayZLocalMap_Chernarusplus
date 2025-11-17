@@ -48,9 +48,9 @@ body {
     flex-wrap: wrap;
 }
 
+/* ОБНОВЛЕННЫЕ СТИЛИ КНОПОК - УВЕЛИЧЕНА СПЕЦИФИЧНОСТЬ */
 .controls button, .controls select, .controls input {
     padding: 6px 10px;
-    background-color: #34495e;
     color: white;
     border: 1px solid #4a6572;
     border-radius: 4px;
@@ -59,31 +59,79 @@ body {
     font-size: 0.9em;
 }
 
-.controls button:hover {
+/* Базовый цвет для кнопок */
+.controls button:not(.help-btn) {
+    background-color: #34495e;
+}
+
+.controls button:not(.help-btn):hover {
     background-color: #4a6572;
+}
+
+/* Специфичные кнопки с приоритетом */
+.controls button#addMarkerBtn {
+    background-color: #3498db !important;
+}
+.controls button#addMarkerBtn:hover {
+    background-color: #2980b9 !important;
+}
+
+.controls button#clearMarkersBtn {
+    background-color: #e74c3c !important;
+}
+.controls button#clearMarkersBtn:hover {
+    background-color: #c0392b !important;
+}
+
+.controls button#searchBtn {
+    background-color: #3498db !important;
+}
+.controls button#searchBtn:hover {
+    background-color: #2980b9 !important;
+}
+
+/* Кнопки координат */
+.controls button#addMarkerByCoords,
+.controls button#imHereBtn {
+    background-color: #3498db !important;
+}
+.controls button#addMarkerByCoords:hover,
+.controls button#imHereBtn:hover {
+    background-color: #2980b9 !important;
+}
+
+/* Кнопка центрирования остается фиолетовой */
+.controls button#centerCoordsBtn {
+    background-color: #9b59b6 !important;
+}
+.controls button#centerCoordsBtn:hover {
+    background-color: #8e44ad !important;
+}
+
+/* Стиль для кнопки экспорта */
+.controls button:last-child:not(.help-btn) {
+    background-color: #f39c12 !important;
+}
+
+.controls button:last-child:not(.help-btn):hover {
+    background-color: #e67e22 !important;
 }
 
 .controls input {
     flex-grow: 1;
     min-width: 150px;
+    background-color: #34495e;
 }
 
-/* Специфичные цвета для разных кнопок */
-.controls button#addMarkerBtn:hover {
-    background-color: #27ae60;
+/* Стили для полей ввода и селектов */
+.controls select {
+    background-color: #34495e;
 }
 
-.controls button#clearMarkersBtn:hover {
-    background-color: #c0392b;
-}
-
-/* Стиль для кнопки экспорта */
-.controls button:last-child {
-    background-color: #f39c12;
-}
-
-.controls button:last-child:hover {
-    background-color: #e67e22;
+.controls input:focus,
+.controls select:focus {
+    outline: none;
+    border-color: #3498db;
 }
 
 .map-container {
@@ -97,7 +145,7 @@ body {
 #map {
     width: 100%;
     height: 100%;
-	background-color: #121212;
+    background-color: #121212;
 }
 
 .sidebar {
@@ -139,8 +187,6 @@ body {
 .search-buttons button {
     flex: 1;
     padding: 6px 10px;
-    background: #3498db;
-    color: white;
     border: none;
     border-radius: 3px;
     cursor: pointer;
@@ -148,12 +194,44 @@ body {
     min-width: 60px;
 }
 
-.search-buttons button:hover {
-    background: #2980b9;
+.search-buttons button#searchBtn {
+    background: #3498db !important;
+    color: white;
+}
+
+.search-buttons button#searchBtn:hover {
+    background: #2980b9 !important;
+}
+
+.search-buttons button#showAllBtn {
+    background: #27ae60 !important;
+    color: white;
+}
+
+.search-buttons button#showAllBtn:hover {
+    background: #229954 !important;
+}
+
+.search-buttons button#hideOthersBtn {
+    background: #f39c12 !important;
+    color: white;
+}
+
+.search-buttons button#hideOthersBtn:hover {
+    background: #e67e22 !important;
+}
+
+.search-buttons button#exportFilteredBtn {
+    background: #f39c12 !important;
+    color: white;
+}
+
+.search-buttons button#exportFilteredBtn:hover {
+    background: #e67e22 !important;
 }
 
 .search-buttons button:disabled {
-    background: #7f8c8d;
+    background: #7f8c8d !important;
     cursor: not-allowed;
     opacity: 0.6;
 }
@@ -209,6 +287,10 @@ body {
     border-radius: 3px;
     cursor: pointer;
     font-size: 0.8em;
+}
+
+.marker-item .delete:hover {
+    background-color: #e74c3c;
 }
 
 /* Стили для разных типов меток */
@@ -356,17 +438,11 @@ body {
 
 .coord-inputs button {
     padding: 6px 10px;
-    background: #9b59b6;
-    color: white;
     border: none;
     border-radius: 3px;
     cursor: pointer;
     font-size: 0.9em;
     white-space: nowrap;
-}
-
-.coord-inputs button:hover {
-    background: #8e44ad;
 }
 
 /* Стили для разделителей */
@@ -375,21 +451,6 @@ body {
     height: 30px;
     background: #555;
     margin: 0 5px;
-}
-
-/* Стили для кнопки экспорта найденных меток */
-#exportFilteredBtn {
-    background: #f39c12 !important;
-}
-
-#exportFilteredBtn:hover {
-    background: #e67e22 !important;
-}
-
-#exportFilteredBtn:disabled {
-    background: #7f8c8d !important;
-    cursor: not-allowed;
-    opacity: 0.6;
 }
 
 /* Адаптивность для мобильных устройств */
@@ -404,11 +465,11 @@ body {
         max-height: 200px;
     }
     
-	.controls-row {
+    .controls-row {
         flex-direction: column;
         align-items: stretch;
     }
-	
+    
     .controls {
         flex-direction: column;
         align-items: stretch;
@@ -417,13 +478,633 @@ body {
     .controls input {
         min-width: auto;
     }
-	
-	.control-separator {
+    
+    .control-separator {
         width: 100%;
         height: 1px;
         margin: 4px 0;
         background: #555;
     }
+}
+
+/* Стили для перемещаемых модальных окон */
+.marker-modal {
+    position: fixed !important;
+    background: #2d2d2d !important;
+    border: 2px solid #444 !important;
+    border-radius: 8px !important;
+    color: white !important;
+    z-index: 10000 !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
+    user-select: none !important;
+    min-width: 420px !important;
+    max-width: 90vw !important;
+    max-height: 90vh !important;
+    padding: 0 !important;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Адаптивность для увеличенной ширины */
+@media (max-width: 480px) {
+    .marker-modal {
+        min-width: 380px !important;
+        max-width: 95vw !important;
+    }
+    
+    .color-inputs {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .color-preview {
+        align-self: center;
+        width: 100px;
+        height: 80px;
+    }
+}
+
+@media (max-width: 400px) {
+    .marker-modal {
+        min-width: 350px !important;
+    }
+    
+    .color-inputs {
+        gap: 12px;
+    }
+}
+
+.modal-header {
+    cursor: move;
+    background: #34495e;
+    padding: 15px 20px;
+    border-radius: 8px 8px 0 0;
+    border-bottom: 1px solid #444;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 0;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: white;
+    font-size: 1.2em;
+    font-weight: bold;
+    padding: 0;
+    line-height: 1.2;
+    flex: 1;
+    margin-right: 15px;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.3s;
+    flex-shrink: 0;
+}
+
+.modal-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.modal-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    padding-right: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.modal-content::-webkit-scrollbar {
+    width: 8px;
+}
+
+.modal-content::-webkit-scrollbar-track {
+    background: #34495e;
+    border-radius: 4px;
+}
+
+.modal-content::-webkit-scrollbar-thumb {
+    background: #7f8c8d;
+    border-radius: 4px;
+}
+
+.modal-content::-webkit-scrollbar-thumb:hover {
+    background: #95a5a6;
+}
+
+/* Оверлей для модального окна */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 9999;
+    display: none;
+}
+
+.modal-overlay.active {
+    display: block;
+}
+
+/* Стили для элементов внутри модального окна */
+.modal-field {
+    margin-bottom: 0;
+}
+
+.modal-field label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+    color: #ecf0f1;
+    font-size: 14px;
+}
+
+.modal-field input,
+.modal-field select {
+    width: 100%;
+    padding: 10px;
+    background: #444;
+    color: white;
+    border: 1px solid #666;
+    border-radius: 4px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.modal-field input:focus,
+.modal-field select:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 5px rgba(52, 152, 219, 0.5);
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+    flex-shrink: 0;
+}
+
+.modal-buttons button {
+    padding: 10px 15px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    transition: background-color 0.3s;
+    flex: 1;
+}
+
+/* Стили для модальных кнопок */
+.modal-buttons button {
+    background: #34495e;
+    color: white;
+}
+
+.modal-buttons button:hover {
+    background: #4a6572;
+}
+
+.modal-buttons button#saveNewMarker,
+.modal-buttons button#saveEdit {
+    background: #27ae60 !important;
+    color: white;
+}
+
+.modal-buttons button#saveNewMarker:hover,
+.modal-buttons button#saveEdit:hover {
+    background: #229954 !important;
+}
+
+.modal-buttons button#deleteMarker {
+    background: #e74c3c !important;
+    color: white;
+}
+
+.modal-buttons button#deleteMarker:hover {
+    background: #c0392b !important;
+}
+
+.modal-buttons button#cancelNewMarker,
+.modal-buttons button#cancelEdit {
+    background: #7f8c8d !important;
+    color: white;
+}
+
+.modal-buttons button#cancelNewMarker:hover,
+.modal-buttons button#cancelEdit:hover {
+    background: #95a5a6 !important;
+}
+
+/* Цветовая палитра - компактная версия */
+.color-palette-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.color-inputs {
+    display: flex;
+    gap: 15px;
+    align-items: flex-start;
+}
+
+.color-palette-wrapper {
+    flex-shrink: 0;
+}
+
+.color-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+}
+
+.color-rgb-inputs {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.color-rgb-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.color-rgb-row span {
+    min-width: 20px;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.color-rgb-row input {
+    width: 70px;
+    padding: 8px;
+    margin: 0;
+    background: #444;
+    color: white;
+    border: 1px solid #666;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.color-preview {
+    width: 80px;
+    height: 60px;
+    border: 2px solid white;
+    border-radius: 4px;
+    flex-shrink: 0;
+    margin-top: 8px;
+}
+
+/* Медиа-запросы для маленьких экранов */
+@media (max-height: 800px) {
+    .marker-modal {
+        max-height: 95vh !important;
+        top: 50% !important;
+        transform: translate(-50%, -50%) !important;
+    }
+    
+    .modal-content {
+        padding: 15px;
+        gap: 12px;
+    }
+    
+    .modal-header {
+        padding: 12px 15px;
+    }
+    
+    .modal-field input,
+    .modal-field select {
+        padding: 8px;
+    }
+    
+    .modal-buttons button {
+        padding: 8px 12px;
+        font-size: 13px;
+    }
+}
+
+@media (max-width: 768px) {
+    .marker-modal {
+        min-width: 320px !important;
+        max-width: 95vw !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        top: 20px !important;
+        max-height: calc(100vh - 40px) !important;
+    }
+    
+    .color-inputs {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .color-preview {
+        align-self: center;
+    }
+    
+    .color-rgb-inputs {
+        width: 100%;
+    }
+    
+    .color-rgb-row input {
+        flex: 1;
+        width: auto;
+    }
+}
+
+@media (max-height: 600px) {
+    .marker-modal {
+        max-height: 98vh !important;
+        top: 10px !important;
+        transform: translateX(-50%) !important;
+    }
+    
+    .modal-content {
+        padding: 10px;
+        gap: 8px;
+    }
+    
+    .modal-header {
+        padding: 10px 12px;
+    }
+    
+    .modal-header h3 {
+        font-size: 1.1em;
+    }
+    
+    .modal-field label {
+        margin-bottom: 5px;
+        font-size: 13px;
+    }
+    
+    .modal-field input,
+    .modal-field select {
+        padding: 6px 8px;
+        font-size: 13px;
+    }
+    
+    .modal-buttons {
+        gap: 8px;
+        margin-top: 5px;
+    }
+    
+    .modal-buttons button {
+        padding: 6px 10px;
+        font-size: 12px;
+    }
+    
+    .coordinates-display {
+        padding: 10px;
+        font-size: 13px;
+    }
+    
+    .color-preview {
+        width: 50px;
+        height: 50px;
+    }
+    
+    .color-rgb-row input {
+        width: 60px;
+        padding: 6px;
+    }
+}
+
+/* Стили для подсветки выбранной метки */
+.marker-item.selected {
+    background-color: #2c3e50 !important;
+    border-left: 4px solid #f39c12 !important;
+    transform: scale(1.02);
+    transition: all 0.3s ease;
+}
+
+.marker-highlighted {
+    animation: pulse 2s ease-in-out;
+    z-index: 1000;
+}
+
+@keyframes pulse {
+    0% {
+        filter: drop-shadow(0 0 5px rgba(243, 156, 18, 0.7));
+    }
+    50% {
+        filter: drop-shadow(0 0 15px rgba(243, 156, 18, 1));
+    }
+    100% {
+        filter: drop-shadow(0 0 5px rgba(243, 156, 18, 0.7));
+    }
+}
+
+/* Улучшаем визуальную обратную связь при наведении */
+.marker-item {
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.marker-item:hover {
+    background-color: #3d566e !important;
+    transform: translateX(2px);
+}
+
+.marker-item .delete {
+    transition: all 0.2s ease;
+}
+
+.marker-item .delete:hover {
+    background-color: #e74c3c;
+    transform: scale(1.1);
+}
+
+/* Стили для поля ввода DayZ координат */
+.coord-inputs input[type="text"] {
+    width: 200px;
+    padding: 6px;
+    background: #444;
+    color: white;
+    border: 1px solid #666;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+
+/* Адаптивность для мобильных устройств */
+@media (max-width: 768px) {
+    .coord-inputs {
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .coord-inputs input[type="text"] {
+        width: 100%;
+    }
+    
+    .coord-inputs button {
+        width: 100%;
+    }
+}
+
+/* Стили для элементов сортировки */
+.sort-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.sort-controls h3 {
+    margin: 0;
+    color: #e74c3c;
+    font-size: 1.1em;
+    text-align: center;
+}
+
+.sort-buttons {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+}
+
+.sort-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 12px;
+    color: white;
+    border: 1px solid #4a6572;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9em;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    min-height: 40px;
+    position: relative;
+    background: #34495e !important;
+}
+
+/* Активная кнопка (подсветка фона) */
+.sort-btn.active {
+    background: #3498db !important;
+    border-color: #2980b9;
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
+}
+
+/* Стрелочка через псевдоэлемент */
+.sort-btn::before {
+    content: "";
+    font-size: 1em;
+    font-weight: bold;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+/* Стрелочка для asc */
+.sort-btn.asc::before {
+    content: "↑";
+    opacity: 1;
+    color: white;
+}
+
+/* Стрелочка для desc */
+.sort-btn.desc::before {
+    content: "↓";
+    opacity: 1;
+    color: white;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .sort-btn {
+        padding: 6px 8px;
+        font-size: 0.85em;
+        min-height: 36px;
+    }
+}
+
+@media (max-width: 480px) {
+    .sort-btn {
+        padding: 5px 6px;
+        font-size: 0.8em;
+        min-height: 34px;
+    }
+}
+
+/* Стили для кнопки помощи */
+.coord-inputs .help-btn {
+    width: 24px !important;
+    height: 24px !important;
+    border-radius: 50% !important;
+    background: none !important;
+    color: #3498db !important;
+    border: 2px solid #3498db !important;
+    font-weight: bold !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 14px !important;
+    transition: all 0.3s ease !important;
+    flex-shrink: 0 !important;
+    margin-left: 5px !important;
+    padding: 0 !important;
+    min-width: auto !important;
+}
+
+.coord-inputs .help-btn:hover {
+    background: none !important;
+    transform: scale(1.1) !important;
+    box-shadow: 0 0 8px rgba(52, 152, 219, 0.5) !important;
+    border-color: #3498db !important;
+    color: #3498db !important;
+}
+
+/* Стили для тултипа */
+.help-tooltip {
+    position: fixed;
+    background: rgba(0, 0, 0, 0.95);
+    color: white;
+    padding: 12px 15px;
+    border-radius: 8px;
+    border: 1px solid #3498db;
+    max-width: 280px;
+    z-index: 10000;
+    font-size: 13px;
+    line-height: 1.4;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+    pointer-events: none;
+    text-align: center;
+}
+
+.help-tooltip::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 6px solid #3498db;
 }
 
 /* Блок с информацией о поддержке */

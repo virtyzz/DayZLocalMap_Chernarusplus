@@ -111,6 +111,11 @@ class DayZMap {
 		this.currentTileLayers = new Map(); // храним ссылки на загруженные тайлы
 		this.markersLoaded = false;
 		this.gridLoaded = false;
+		this.currentSort = {
+            field: 'name',
+            direction: 'asc' // 'asc' или 'desc'
+        };
+        this.sortDirection = 1;
         this.init();
     }
 
@@ -809,6 +814,31 @@ class DayZMap {
 
             document.querySelector('.controls').appendChild(importButton);
             document.querySelector('.controls').appendChild(fileInput);
+			
+			// Обработчики для новых кнопок координат DayZ
+			const centerCoordsBtn = document.getElementById('centerCoordsBtn');
+			if (centerCoordsBtn) {
+				centerCoordsBtn.addEventListener('click', () => {
+					this.centerOnDayZCoords();
+				});
+			}
+
+			const imHereBtn = document.getElementById('imHereBtn');
+			if (imHereBtn) {
+				imHereBtn.addEventListener('click', () => {
+					this.imHereAtDayZCoords();
+				});
+			}
+
+			// Обработчик Enter для поля ввода DayZ координат
+			const dayzCoordsInput = document.getElementById('dayzCoordsInput');
+			if (dayzCoordsInput) {
+				dayzCoordsInput.addEventListener('keypress', (e) => {
+					if (e.key === 'Enter') {
+						this.centerOnDayZCoords();
+					}
+				});
+			}
 
             // Обработчик общей прозрачности  
             const globalOpacitySlider = document.getElementById('globalOpacity');
@@ -895,6 +925,40 @@ class DayZMap {
 					this.updateMarkersList();
 				}
 			});
+			
+			// Обработчик для сортировки меток
+            const sortSelect = document.getElementById('sortMarkers');
+            if (sortSelect) {
+                sortSelect.addEventListener('change', (e) => {
+                    this.currentSort = e.target.value;
+                    this.updateMarkersList();
+                });
+            }
+			
+			// Обработчики для кнопок сортировки
+            document.querySelectorAll('.sort-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const sortField = e.currentTarget.dataset.sort;
+                    this.toggleSort(sortField);
+                    this.updateSortButtons();
+                    this.updateMarkersList();
+                });
+            });
+			
+			// Обработчик для кнопки помощи по координатам
+			const coordsHelpBtn = document.getElementById('coordsHelpBtn');
+			if (coordsHelpBtn) {
+				coordsHelpBtn.addEventListener('click', () => {
+					this.showCoordsHelp();
+				});
+			}
+			// Обработчик для кнопки помощи по координатам 2
+			const coordsHelpBtn2 = document.getElementById('coordsHelpBtn2');
+			if (coordsHelpBtn2) {
+				coordsHelpBtn2.addEventListener('click', () => {
+					this.showCoordsHelp2(); // Будет другой текст подсказки
+				});
+			}
 			
         } catch (error) {
             console.error('Ошибка при привязке событий:', error);
@@ -1318,93 +1382,82 @@ class DayZMap {
     }
     
 	showAddMarkerModal(leafletLatLng, gameCoords) {
-		const modal = document.createElement('div');
-		modal.className = 'marker-modal';
-		modal.style.cssText = `
-			position: fixed;
-			top: 50%;
-			left: 50%;
-			transform: translate(-50%, -50%);
-			background: #2d2d2d;
-			padding: 20px;
-			border-radius: 8px;
-			z-index: 10000;
-			color: white;
-			min-width: 320px;
-			border: 2px solid #444;
-			max-height: 80vh;
-			overflow-y: auto;
-		`;
+        // Получаем RGB значения из последних параметров
+        let r, g, b;
+        if (this.lastMarkerParams.color.startsWith('rgb')) {
+            const rgbMatch = this.lastMarkerParams.color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+            if (rgbMatch) {
+                r = rgbMatch[1];
+                g = rgbMatch[2];
+                b = rgbMatch[3];
+            } else {
+                r = 52; g = 152; b = 219;
+            }
+        } else {
+            const rgb = this.hexToRgb(this.lastMarkerParams.color);
+            r = rgb.r;
+            g = rgb.g;
+            b = rgb.b;
+        }
 
-		// Получаем RGB значения из последних параметров
-		let r, g, b;
-		if (this.lastMarkerParams.color.startsWith('rgb')) {
-			const rgbMatch = this.lastMarkerParams.color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-			if (rgbMatch) {
-				r = rgbMatch[1];
-				g = rgbMatch[2];
-				b = rgbMatch[3];
-			} else {
-				r = 52; g = 152; b = 219;
-			}
-		} else {
-			const rgb = this.hexToRgb(this.lastMarkerParams.color);
-			r = rgb.r;
-			g = rgb.g;
-			b = rgb.b;
-		}
-
-		modal.innerHTML = `
-			<h3>Добавление новой метки</h3>
-			<div style="margin-bottom: 15px;">
+        const content = `
+			<div class="modal-field">
 				<label>Текст метки:</label>
-				<input type="text" id="newMarkerText" value="${this.lastMarkerParams.text}" style="width: 100%; padding: 5px; margin-top: 5px; background: #444; color: white; border: 1px solid #666;">
+				<input type="text" id="newMarkerText" value="${this.lastMarkerParams.text}">
 			</div>
-			<div style="margin-bottom: 15px;">
+			
+			<div class="modal-field">
 				<label>Тип метки:</label>
-				<select id="newMarkerType" style="width: 100%; padding: 5px; margin-top: 5px; background: #444; color: white; border: 1px solid #666;">
+				<select id="newMarkerType">
 					${this.getMarkerTypeOptions(this.lastMarkerParams.type)}
 				</select>
 			</div>
 			
-			<!-- Цветовая палитра -->
-			<div style="margin-bottom: 15px;">
+			<div class="modal-field">
 				<label>Цвет метки (кликните на палитру или введите RGB):</label>
-				<div style="display: flex; align-items: flex-start; gap: 15px; margin-top: 10px;">
-					<div id="colorPalette" style="flex-shrink: 0;"></div>
-					<div style="display: flex; flex-direction: column; gap: 8px;">
-						<div style="display: flex; gap: 5px; align-items: center;">
-							<span style="min-width: 20px;">R:</span>
-							<input type="number" id="newColorR" min="0" max="255" value="${r}" style="width: 60px; padding: 5px; background: #444; color: white; border: 1px solid #666;">
+				<div class="color-palette-container">
+					<div class="color-inputs">
+						<div class="color-palette-wrapper">
+							<div id="colorPalette"></div>
 						</div>
-						<div style="display: flex; gap: 5px; align-items: center;">
-							<span style="min-width: 20px;">G:</span>
-							<input type="number" id="newColorG" min="0" max="255" value="${g}" style="width: 60px; padding: 5px; background: #444; color: white; border: 1px solid #666;">
+						<div class="color-controls">
+							<div class="color-rgb-inputs">
+								<div class="color-rgb-row">
+									<span>R:</span>
+									<input type="number" id="newColorR" min="0" max="255" value="${r}">
+								</div>
+								<div class="color-rgb-row">
+									<span>G:</span>
+									<input type="number" id="newColorG" min="0" max="255" value="${g}">
+								</div>
+								<div class="color-rgb-row">
+									<span>B:</span>
+									<input type="number" id="newColorB" min="0" max="255" value="${b}">
+								</div>
+							</div>
+							<div class="color-preview" id="newColorPreview" style="background: ${this.lastMarkerParams.color};"></div>
 						</div>
-						<div style="display: flex; gap: 5px; align-items: center;">
-							<span style="min-width: 20px;">B:</span>
-							<input type="number" id="newColorB" min="0" max="255" value="${b}" style="width: 60px; padding: 5px; background: #444; color: white; border: 1px solid #666;">
-						</div>
-						<div style="width: 60px; height: 60px; background: ${this.lastMarkerParams.color}; border: 2px solid white; border-radius: 4px; margin-top: 5px;" id="newColorPreview"></div>
 					</div>
 				</div>
 			</div>
 			
-			<div style="margin-bottom: 15px; padding: 10px; background: #34495e; border-radius: 4px;">
-				<strong>Координаты:</strong>
-				<br>
+			<div class="coordinates-display">
+				<strong>Координаты:</strong><br>
 				X: ${gameCoords.x}<br>
 				Y: ${gameCoords.y}
 			</div>
-			<div style="display: flex; justify-content: space-between; margin-top: 20px;">
-				<button id="saveNewMarker" style="padding: 8px 15px; background: #27ae60; color: white; border: none; border-radius: 4px; cursor: pointer;">Добавить</button>
-				<button id="cancelNewMarker" style="padding: 8px 15px; background: #7f8c8d; color: white; border: none; border-radius: 4px; cursor: pointer;">Отмена</button>
+			
+			<div class="modal-buttons">
+				<button id="saveNewMarker" style="background: #27ae60; color: white;">Добавить</button>
+				<button id="cancelNewMarker" style="background: #7f8c8d; color: white;">Отмена</button>
 			</div>
 		`;
 
-		document.body.appendChild(modal);
+		const modal = this.createDraggableModal('Добавление новой метки', content, () => {
+			this.disableMarkerMode();
+		});
 
-		// Создаем цветовую палитру
+         // Создаем цветовую палитру
 		this.createColorPalette('colorPalette', 'newColorR', 'newColorG', 'newColorB', 'newColorPreview');
 
 		const updateColorPreview = () => {
@@ -1419,135 +1472,142 @@ class DayZMap {
 		document.getElementById('newColorG').addEventListener('input', updateColorPreview);
 		document.getElementById('newColorB').addEventListener('input', updateColorPreview);
 
-		// Создаем обработчики с правильным управлением памятью
-		const saveHandler = () => {
+		// Обработчики кнопок
+		document.getElementById('saveNewMarker').addEventListener('click', () => {
 			this.saveNewMarker(leafletLatLng, gameCoords);
 			this.closeModal(modal);
-		};
+		});
 
-		const cancelHandler = () => {
+		document.getElementById('cancelNewMarker').addEventListener('click', () => {
 			this.closeModal(modal);
 			this.disableMarkerMode();
-		};
-
-		const keyHandler = (e) => {
-			if (e.key === 'Escape') {
-				this.closeModal(modal);
-				this.disableMarkerMode();
-			}
-		};
-
-		document.getElementById('saveNewMarker').addEventListener('click', saveHandler);
-		document.getElementById('cancelNewMarker').addEventListener('click', cancelHandler);
-		document.addEventListener('keydown', keyHandler);
-
-		// Сохраняем обработчики для последующей очистки
-		this.modalCloseHandlers.set(modal, {
-			saveHandler,
-			cancelHandler,
-			keyHandler
 		});
+
+		return modal;
 	}
 
 
     closeModal(modal) {
         const handlers = this.modalCloseHandlers.get(modal);
         if (handlers) {
-            document.removeEventListener('keydown', handlers.keyHandler);
+            if (handlers.closeHandler) {
+                handlers.closeHandler();
+            }
+            
+            // Удаляем обработчики перетаскивания
+            if (handlers.dragHandlers) {
+                document.removeEventListener('mousemove', handlers.dragHandlers.drag);
+                document.removeEventListener('mouseup', handlers.dragHandlers.dragEnd);
+            }
+            
             this.modalCloseHandlers.delete(modal);
         }
+        
         if (modal.parentNode) {
             modal.parentNode.removeChild(modal);
+        }
+        
+        // Убираем оверлей если нет других модальных окон
+        const activeModals = document.querySelectorAll('.marker-modal');
+        if (activeModals.length === 0) {
+            const overlay = document.querySelector('.modal-overlay');
+            if (overlay) {
+                overlay.classList.remove('active');
+            }
         }
     }
     
     saveNewMarker(leafletLatLng, gameCoords) {
-        const markerText = document.getElementById('newMarkerText').value || 'Метка';
-        const markerType = document.getElementById('newMarkerType').value;
-        const r = document.getElementById('newColorR').value;
-        const g = document.getElementById('newColorG').value;
-        const b = document.getElementById('newColorB').value;
-        const markerColor = `rgb(${r}, ${g}, ${b})`;
+		const markerText = document.getElementById('newMarkerText').value || 'Метка';
+		const markerType = document.getElementById('newMarkerType').value;
+		const r = document.getElementById('newColorR').value;
+		const g = document.getElementById('newColorG').value;
+		const b = document.getElementById('newColorB').value;
+		const markerColor = `rgb(${r}, ${g}, ${b})`;
 
-        // Сохраняем параметры для следующей метки
-        this.lastMarkerParams = {
-            text: markerText,
-            type: markerType,
-            color: markerColor
-        };
+		// Сохраняем параметры для следующей метки
+		this.lastMarkerParams = {
+			text: markerText,
+			type: markerType,
+			color: markerColor
+		};
 
-        // Проверяем на дубликаты
-        if (this.isMarkerDuplicate(markerText, gameCoords)) {
-            this.showError('Метка с таким названием и координатами уже существует');
-            this.disableMarkerMode();
-            return;
-        }
+		// Проверяем на дубликаты
+		if (this.isMarkerDuplicate(markerText, gameCoords)) {
+			this.showError('Метка с таким названием и координатами уже существует');
+			this.disableMarkerMode();
+			return;
+		}
 
-        const opacity = this.globalMarkerOpacity;
-        const icon = this.createMarkerIcon(markerType, markerColor, opacity);
+		const opacity = this.globalMarkerOpacity;
+		const icon = this.createMarkerIcon(markerType, markerColor, opacity);
 
-        const marker = L.marker(leafletLatLng, { icon: icon })
-            .addTo(this.map)
-            .bindPopup(`
-                <div class="marker-popup">
-                    <strong>${markerText}</strong>
-                    <br>
-                    Тип: ${this.getMarkerTypeName(markerType)}<br>
-                    Координаты: X:${gameCoords.x} Y:${gameCoords.y}
-                </div>
-            `);
+		const marker = L.marker(leafletLatLng, { icon: icon })
+			.addTo(this.map)
+			.bindPopup(`
+				<div class="marker-popup">
+					<strong>${markerText}</strong>
+					<br>
+					Тип: ${this.getMarkerTypeName(markerType)}<br>
+					Координаты: X:${gameCoords.x} Y:${gameCoords.y}${gameCoords.z ? ` Z:${gameCoords.z}` : ''}
+				</div>
+			`);
 
-        const textLabel = L.marker(leafletLatLng, {
-            icon: this.createTextLabel(markerText, markerColor, opacity),
-            interactive: false
-        }).addTo(this.map);
+		const textLabel = L.marker(leafletLatLng, {
+			icon: this.createTextLabel(markerText, markerColor, opacity),
+			interactive: false
+		}).addTo(this.map);
 
-        // Для новых меток создаем базовый набор оригинальных данных
-        const originalData = {
-            type: 5,
-            uid: Date.now() / 1000,
-            name: markerText,
-            icon: this.getIconPathFromType(markerType),
-            position: [gameCoords.x, 0, gameCoords.y], // Z = 0 для новых меток
-            currentSubgroup: 0,
-            colorA: 255,
-            colorR: parseInt(r),
-            colorG: parseInt(g),
-            colorB: parseInt(b),
-            creatorSteamID: "",
-            circleRadius: 0.0,
-            circleColorA: 255,
-            circleColorR: 255,
-            circleColorG: 255,
-            circleColorB: 255,
-            circleStriked: 0,
-            circleLayer: -1,
-            showAllPlayerNametags: 0
-        };
+		// Для новых меток создаем базовый набор оригинальных данных С Z КООРДИНАТОЙ
+		const originalData = {
+			type: 5,
+			uid: Date.now() / 1000,
+			name: markerText,
+			icon: this.getIconPathFromType(markerType),
+			position: [gameCoords.x, gameCoords.z || 0, gameCoords.y], // Сохраняем Z координату
+			currentSubgroup: 0,
+			colorA: 255,
+			colorR: parseInt(r),
+			colorG: parseInt(g),
+			colorB: parseInt(b),
+			creatorSteamID: "",
+			circleRadius: 0.0,
+			circleColorA: 255,
+			circleColorR: 255,
+			circleColorG: 255,
+			circleColorB: 255,
+			circleStriked: 0,
+			circleLayer: -1,
+			showAllPlayerNametags: 0
+		};
 
-        const markerData = {
-            id: Date.now(),
-            leafletLatLng: { lat: leafletLatLng.lat, lng: leafletLatLng.lng },
-            gameCoords: { ...gameCoords, z: 0 }, // Сохраняем Z координату
-            text: markerText,
-            type: markerType,
-            color: markerColor,
-            marker: marker,
-            textLabel: textLabel,
-            originalData: originalData // Сохраняем оригинальные данные
-        };
+		const markerData = {
+			id: Date.now(),
+			leafletLatLng: { lat: leafletLatLng.lat, lng: leafletLatLng.lng },
+			gameCoords: { 
+				x: gameCoords.x, 
+				y: gameCoords.y, 
+				z: gameCoords.z || 0 // Сохраняем Z координату
+			},
+			text: markerText,
+			type: markerType,
+			color: markerColor,
+			marker: marker,
+			textLabel: textLabel,
+			originalData: originalData // Сохраняем оригинальные данные
+		};
 
-        marker.on('dblclick', () => {
-            this.editMarker(markerData);
-        });
+		marker.on('dblclick', () => {
+			this.editMarker(markerData);
+		});
 
-        this.markers.push(markerData);
-        this.saveMarkers();
-        this.updateMarkersList();
-        this.disableMarkerMode();
+		this.markers.push(markerData);
+		this.saveMarkers();
+		this.updateMarkersList();
+		this.disableMarkerMode();
 
-        this.showSuccess('Метка добавлена');
-    }
+		this.showSuccess('Метка добавлена');
+	}
 
     createMarkerIcon(type, customColor = null, opacity = this.globalMarkerOpacity) {
         const markerType = MARKER_TYPES[type] || MARKER_TYPES.default;
@@ -1629,136 +1689,109 @@ class DayZMap {
     }
 
     showEditModal(markerData) {
-    const modal = document.createElement('div');
-    modal.className = 'marker-modal';
-    modal.style.cssText = `
-        position: fixed;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        background: #2d2d2d;
-        padding: 20px;
-        border-radius: 8px;
-        z-index: 10000;
-        color: white;
-        min-width: 320px;
-        border: 2px solid #444;
-    `;
-
-    // Получаем RGB значения из цвета метки
-    let r, g, b;
-    if (markerData.color.startsWith('rgb')) {
-        const rgbMatch = markerData.color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-        if (rgbMatch) {
-            r = rgbMatch[1];
-            g = rgbMatch[2];
-            b = rgbMatch[3];
+        // Получаем RGB значения из цвета метки
+        let r, g, b;
+        if (markerData.color.startsWith('rgb')) {
+            const rgbMatch = markerData.color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+            if (rgbMatch) {
+                r = rgbMatch[1];
+                g = rgbMatch[2];
+                b = rgbMatch[3];
+            } else {
+                r = 52; g = 152; b = 219;
+            }
         } else {
-            r = 52; g = 152; b = 219;
+            const rgb = this.hexToRgb(markerData.color);
+            r = rgb.r;
+            g = rgb.g;
+            b = rgb.b;
         }
-    } else {
-        const rgb = this.hexToRgb(markerData.color);
-        r = rgb.r;
-        g = rgb.g;
-        b = rgb.b;
-    }
 
-    modal.innerHTML = `
-        <h3>Редактирование метки</h3>
-        <div style="margin-bottom: 15px;">
-            <label>Текст метки:</label>
-            <input type="text" id="editMarkerText" value="${markerData.text}" style="width: 100%; padding: 5px; margin-top: 5px; background: #444; color: white; border: 1px solid #666;">
-        </div>
-        <div style="margin-bottom: 15px;">
-            <label>Тип метки:</label>
-            <select id="editMarkerType" style="width: 100%; padding: 5px; margin-top: 5px; background: #444; color: white; border: 1px solid #666;">
-                ${this.getMarkerTypeOptions(markerData.type)}
-            </select>
-        </div>
-        
-        <!-- Цветовая палитра -->
-        <div style="margin-bottom: 15px;">
-            <label>Цвет метки (кликните на палитру или введите RGB):</label>
-            <div style="display: flex; align-items: flex-start; gap: 15px; margin-top: 10px;">
-                <div id="editColorPalette" style="flex-shrink: 0;"></div>
-                <div style="display: flex; flex-direction: column; gap: 8px;">
-                    <div style="display: flex; gap: 5px; align-items: center;">
-                        <span style="min-width: 20px;">R:</span>
-                        <input type="number" id="editColorR" min="0" max="255" value="${r}" style="width: 60px; padding: 5px; background: #444; color: white; border: 1px solid #666;">
-                    </div>
-                    <div style="display: flex; gap: 5px; align-items: center;">
-                        <span style="min-width: 20px;">G:</span>
-                        <input type="number" id="editColorG" min="0" max="255" value="${g}" style="width: 60px; padding: 5px; background: #444; color: white; border: 1px solid #666;">
-                    </div>
-                    <div style="display: flex; gap: 5px; align-items: center;">
-                        <span style="min-width: 20px;">B:</span>
-                        <input type="number" id="editColorB" min="0" max="255" value="${b}" style="width: 60px; padding: 5px; background: #444; color: white; border: 1px solid #666;">
-                    </div>
-                    <div style="width: 60px; height: 60px; background: ${markerData.color}; border: 2px solid white; border-radius: 4px; margin-top: 5px;" id="colorPreview"></div>
-                </div>
-            </div>
-        </div>
-        <div style="display: flex; justify-content: space-between; margin-top: 20px;">
-            <button id="saveEdit" style="padding: 8px 15px; background: #27ae60; color: white; border: none; border-radius: 4px; cursor: pointer;">Сохранить</button>
-            <button id="deleteMarker" style="padding: 8px 15px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer;">Удалить</button>
-            <button id="cancelEdit" style="padding: 8px 15px; background: #7f8c8d; color: white; border: none; border-radius: 4px; cursor: pointer;">Отмена</button>
-        </div>
-    `;
+        const content = `
+			<div class="modal-field">
+				<label>Текст метки:</label>
+				<input type="text" id="editMarkerText" value="${markerData.text}">
+			</div>
+			
+			<div class="modal-field">
+				<label>Тип метки:</label>
+				<select id="editMarkerType">
+					${this.getMarkerTypeOptions(markerData.type)}
+				</select>
+			</div>
+			
+			<div class="modal-field">
+				<label>Цвет метки (кликните на палитру или введите RGB):</label>
+				<div class="color-palette-container">
+					<div class="color-inputs">
+						<div class="color-palette-wrapper">
+							<div id="editColorPalette"></div>
+						</div>
+						<div class="color-controls">
+							<div class="color-rgb-inputs">
+								<div class="color-rgb-row">
+									<span>R:</span>
+									<input type="number" id="editColorR" min="0" max="255" value="${r}">
+								</div>
+								<div class="color-rgb-row">
+									<span>G:</span>
+									<input type="number" id="editColorG" min="0" max="255" value="${g}">
+								</div>
+								<div class="color-rgb-row">
+									<span>B:</span>
+									<input type="number" id="editColorB" min="0" max="255" value="${b}">
+								</div>
+							</div>
+							<div class="color-preview" id="colorPreview" style="background: ${markerData.color};"></div>
+						</div>
+					</div>
+				</div>
+			</div>
+			
+			<div class="modal-buttons">
+				<button id="saveEdit" style="background: #27ae60; color: white;">Сохранить</button>
+				<button id="deleteMarker" style="background: #e74c3c; color: white;">Удалить</button>
+				<button id="cancelEdit" style="background: #7f8c8d; color: white;">Отмена</button>
+			</div>
+		`;
 
-    document.body.appendChild(modal);
+		const modal = this.createDraggableModal('Редактирование метки', content);
 
-    // Создаем цветовую палитру для редактирования (исправленный вызов)
-    this.createColorPalette('editColorPalette', 'editColorR', 'editColorG', 'editColorB', 'colorPreview');
+		// Создаем цветовую палитру для редактирования
+		this.createColorPalette('editColorPalette', 'editColorR', 'editColorG', 'editColorB', 'colorPreview');
 
-    const updateColorPreview = () => {
-        const r = document.getElementById('editColorR').value;
-        const g = document.getElementById('editColorG').value;
-        const b = document.getElementById('editColorB').value;
-        const color = `rgb(${r}, ${g}, ${b})`;
-        document.getElementById('colorPreview').style.background = color;
-    };
+		const updateColorPreview = () => {
+			const r = document.getElementById('editColorR').value;
+			const g = document.getElementById('editColorG').value;
+			const b = document.getElementById('editColorB').value;
+			const color = `rgb(${r}, ${g}, ${b})`;
+			document.getElementById('colorPreview').style.background = color;
+		};
 
-    document.getElementById('editColorR').addEventListener('input', updateColorPreview);
-    document.getElementById('editColorG').addEventListener('input', updateColorPreview);
-    document.getElementById('editColorB').addEventListener('input', updateColorPreview);
+		document.getElementById('editColorR').addEventListener('input', updateColorPreview);
+		document.getElementById('editColorG').addEventListener('input', updateColorPreview);
+		document.getElementById('editColorB').addEventListener('input', updateColorPreview);
 
-    // Создаем обработчики с правильным управлением памятью
-    const saveHandler = () => {
-        this.saveMarkerEdit(markerData);
-        this.closeModal(modal);
-    };
+		// Обработчики кнопок
+		document.getElementById('saveEdit').addEventListener('click', () => {
+			this.saveMarkerEdit(markerData);
+			this.closeModal(modal);
+		});
 
-    const deleteHandler = () => {
-        if (confirm('Вы уверены, что хотите удалить эту метку?')) {
-            this.removeMarker(markerData.id);
-            this.closeModal(modal);
-        }
-    };
+		document.getElementById('deleteMarker').addEventListener('click', () => {
+			if (confirm('Вы уверены, что хотите удалить эту метку?')) {
+				this.removeMarker(markerData.id);
+				this.closeModal(modal);
+			}
+		});
 
-    const cancelHandler = () => {
-        this.closeModal(modal);
-    };
+		document.getElementById('cancelEdit').addEventListener('click', () => {
+			this.closeModal(modal);
+		});
 
-    const keyHandler = (e) => {
-        if (e.key === 'Escape') {
-            this.closeModal(modal);
-        }
-    };
-
-    document.getElementById('saveEdit').addEventListener('click', saveHandler);
-    document.getElementById('deleteMarker').addEventListener('click', deleteHandler);
-    document.getElementById('cancelEdit').addEventListener('click', cancelHandler);
-    document.addEventListener('keydown', keyHandler);
-
-    // Сохраняем обработчики для последующей очистки
-    this.modalCloseHandlers.set(modal, {
-        saveHandler,
-        deleteHandler,
-        cancelHandler,
-        keyHandler
-    });
-}
-
+		return modal;
+	}
+	
 // Метод для создания цветовой палитры на Canvas
 createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
     const paletteContainer = document.getElementById(containerId);
@@ -1852,76 +1885,81 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
 }
 
     saveMarkerEdit(markerData) {
-    const newText = document.getElementById('editMarkerText').value;
-    const newType = document.getElementById('editMarkerType').value;
-    const r = document.getElementById('editColorR').value;
-    const g = document.getElementById('editColorG').value;
-    const b = document.getElementById('editColorB').value;
-    const newColor = `rgb(${r}, ${g}, ${b})`;
+		const newText = document.getElementById('editMarkerText').value;
+		const newType = document.getElementById('editMarkerType').value;
+		const r = document.getElementById('editColorR').value;
+		const g = document.getElementById('editColorG').value;
+		const b = document.getElementById('editColorB').value;
+		const newColor = `rgb(${r}, ${g}, ${b})`;
 
-    // Сохраняем параметры для следующей метки
-    this.lastMarkerParams = {
-        text: newText,
-        type: newType,
-        color: newColor
-    };
+		// Сохраняем параметры для следующей метки
+		this.lastMarkerParams = {
+			text: newText,
+			type: newType,
+			color: newColor
+		};
 
-    markerData.text = newText;
-    markerData.type = newType;
-    markerData.color = newColor;
+		markerData.text = newText;
+		markerData.type = newType;
+		markerData.color = newColor;
 
-    // Обновляем оригинальный данные
-    if (markerData.originalData) {
-        markerData.originalData.name = newText;
-        markerData.originalData.icon = this.getIconPathFromType(newType);
-        markerData.originalData.colorR = parseInt(r);
-        markerData.originalData.colorG = parseInt(g);
-        markerData.originalData.colorB = parseInt(b);
-    } else {
-        // Если оригинальных данных нет (для новых меток), создаем их
-        markerData.originalData = {
-            type: 5,
-            uid: markerData.id,
-            name: newText,
-            icon: this.getIconPathFromType(newType),
-            position: [markerData.gameCoords.x, markerData.gameCoords.z || 0, markerData.gameCoords.y],
-            currentSubgroup: 0,
-            colorA: 255,
-            colorR: parseInt(r),
-            colorG: parseInt(g),
-            colorB: parseInt(b),
-            creatorSteamID: "",
-            circleRadius: 0.0,
-            circleColorA: 255,
-            circleColorR: 255,
-            circleColorG: 255,
-            circleColorB: 255,
-            circleStriked: 0,
-            circleLayer: -1,
-            showAllPlayerNametags: 0
-        };
-    }
+		// Обновляем оригинальный данные С СОХРАНЕНИЕМ Z КООРДИНАТЫ
+		if (markerData.originalData) {
+			markerData.originalData.name = newText;
+			markerData.originalData.icon = this.getIconPathFromType(newType);
+			markerData.originalData.position = [
+				markerData.gameCoords.x,
+				markerData.gameCoords.z || 0, // Сохраняем Z координату
+				markerData.gameCoords.y
+			];
+			markerData.originalData.colorR = parseInt(r);
+			markerData.originalData.colorG = parseInt(g);
+			markerData.originalData.colorB = parseInt(b);
+		} else {
+			// Если оригинальных данных нет (для новых меток), создаем их С Z КООРДИНАТОЙ
+			markerData.originalData = {
+				type: 5,
+				uid: markerData.id,
+				name: newText,
+				icon: this.getIconPathFromType(newType),
+				position: [markerData.gameCoords.x, markerData.gameCoords.z || 0, markerData.gameCoords.y], // Z координата
+				currentSubgroup: 0,
+				colorA: 255,
+				colorR: parseInt(r),
+				colorG: parseInt(g),
+				colorB: parseInt(b),
+				creatorSteamID: "",
+				circleRadius: 0.0,
+				circleColorA: 255,
+				circleColorR: 255,
+				circleColorG: 255,
+				circleColorB: 255,
+				circleStriked: 0,
+				circleLayer: -1,
+				showAllPlayerNametags: 0
+			};
+		}
 
-    const newIcon = this.createMarkerIcon(newType, newColor, this.globalMarkerOpacity);
-    markerData.marker.setIcon(newIcon);
+		const newIcon = this.createMarkerIcon(newType, newColor, this.globalMarkerOpacity);
+		markerData.marker.setIcon(newIcon);
 
-    const newTextLabel = this.createTextLabel(newText, newColor, this.globalMarkerOpacity);
-    markerData.textLabel.setIcon(newTextLabel);
+		const newTextLabel = this.createTextLabel(newText, newColor, this.globalMarkerOpacity);
+		markerData.textLabel.setIcon(newTextLabel);
 
-    markerData.marker.bindPopup(`
-        <div class="marker-popup">
-            <strong>${newText}</strong>
-            <br>
-            Тип: ${this.getMarkerTypeName(newType)}<br>
-            Координаты: X:${markerData.gameCoords.x} Y:${markerData.gameCoords.y}${markerData.gameCoords.z ? ` Z:${markerData.gameCoords.z}` : ''}
-        </div>
-    `);
+		markerData.marker.bindPopup(`
+			<div class="marker-popup">
+				<strong>${newText}</strong>
+				<br>
+				Тип: ${this.getMarkerTypeName(newType)}<br>
+				Координаты: X:${markerData.gameCoords.x} Y:${markerData.gameCoords.y}${markerData.gameCoords.z ? ` Z:${markerData.gameCoords.z}` : ''}
+			</div>
+		`);
 
-    this.saveMarkers();
-    this.updateMarkersList();
-    
-    this.showSuccess('Метка обновлена');
-}
+		this.saveMarkers();
+		this.updateMarkersList();
+		
+		this.showSuccess('Метка обновлена');
+	}
 
     getMarkerTypeOptions(currentType) {
         let options = '';
@@ -1969,7 +2007,10 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
         if (!container) return;
         
         container.innerHTML = '';
-        const markersToShow = this.searchFilter ? this.filteredMarkers : this.markers;
+        
+        // Получаем метки для отображения и сортируем их
+        let markersToShow = this.searchFilter ? this.filteredMarkers : this.markers;
+        markersToShow = this.sortMarkers(markersToShow);
         
         if (this.searchFilter && markersToShow.length === 0) {
             container.innerHTML = `<div class="no-results">Метки по запросу "${this.searchFilter}" не найдены</div>`;
@@ -1991,11 +2032,28 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
                     <button class="delete" onclick="dayzMap.removeMarker(${markerData.id})">×</button>
                 `;
                 
-                // Добавляем обработчик клика для центрирования на метке
+                // Обработчик двойного клика для центрирования и зума
+                item.addEventListener('dblclick', (e) => {
+                    if (!e.target.classList.contains('delete')) {
+                        // Центрируем карту на метке с зумом 8
+                        this.map.setView(markerData.leafletLatLng, 8);
+                        // Открываем попап метки
+                        markerData.marker.openPopup();
+                        
+                        // Показываем анимацию или подсветку для визуальной обратной связи
+                        this.highlightMarker(markerData);
+                    }
+                });
+                
+                // Обычный клик (одинарный) - просто центрируем без зума
                 item.addEventListener('click', (e) => {
                     if (!e.target.classList.contains('delete')) {
-                        this.map.setView(markerData.leafletLatLng, this.map.getZoom());
+                        // Просто центрируем на метке без изменения зума
+                        this.map.setView(markerData.leafletLatLng);
                         markerData.marker.openPopup();
+                        
+                        // Показываем анимацию или подсветку для визуальной обратной связи
+                        this.highlightMarker(markerData);
                     }
                 });
                 
@@ -2007,6 +2065,38 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
         this.updateMarkersCounter();
         this.updateSearchButtons();
     }
+	
+	// Добавьте метод для подсветки метки при выборе
+	highlightMarker(markerData) {
+		// Временно добавляем класс для подсветки
+		markerData.marker.getElement().classList.add('marker-highlighted');
+		
+		// Убираем подсветку через 2 секунды
+		setTimeout(() => {
+			if (markerData.marker.getElement()) {
+				markerData.marker.getElement().classList.remove('marker-highlighted');
+			}
+		}, 2000);
+		
+		// Также подсвечиваем соответствующий элемент в списке
+		const markerItems = document.querySelectorAll('.marker-item');
+		markerItems.forEach(item => {
+			item.classList.remove('selected');
+		});
+		
+		// Находим и подсвечиваем текущий элемент
+		const currentItem = Array.from(markerItems).find(item => {
+			const coordsDiv = item.querySelector('.coords');
+			return coordsDiv && coordsDiv.textContent.includes(`X:${markerData.gameCoords.x} Y:${markerData.gameCoords.y}`);
+		});
+		
+		if (currentItem) {
+			currentItem.classList.add('selected');
+			
+			// Прокручиваем список чтобы элемент был виден
+			currentItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+		}
+	}
 
     // Метод для обновления состояния кнопок
     updateSearchButtons() {
@@ -2037,7 +2127,7 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
 			}
 		} else {
 			searchBtn.textContent = 'Поиск';
-			searchBtn.style.background = '#3498db';
+			searchBtn.style.background = '';
 			showAllBtn.style.display = 'none';
 			exportFilteredBtn.style.display = 'none';
 			hideOthersBtn.disabled = true;
@@ -2222,12 +2312,18 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
 							interactive: false
 						}).addTo(this.map);
 
+						// ВОССТАНАВЛИВАЕМ Z КООРДИНАТУ ПРИ ЗАГРУЗКЕ
 						const markerData = {
 							...savedMarkerData,
 							leafletLatLng: leafletLatLng,
 							color: color,
 							marker: marker,
-							textLabel: textLabel
+							textLabel: textLabel,
+							// Гарантируем что Z координата есть
+							gameCoords: {
+								...savedMarkerData.gameCoords,
+								z: savedMarkerData.gameCoords.z || 0
+							}
 						};
 
 						marker.on('dblclick', () => {
@@ -2357,16 +2453,20 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
                             originalData.position = [x, z, y];
 
                             const markerData = {
-                                id: Date.now() + Math.random(),
-                                leafletLatLng: { lat: leafletLatLng.lat, lng: leafletLatLng.lng },
-                                gameCoords: gameCoords,
-                                text: markerName,
-                                type: markerType,
-                                color: markerColor,
-                                marker: markerObj,
-                                textLabel: textLabel,
-                                originalData: originalData // Сохраняем ВСЕ оригинальные данные как есть
-                            };
+								id: Date.now() + Math.random(),
+								leafletLatLng: { lat: leafletLatLng.lat, lng: leafletLatLng.lng },
+								gameCoords: { 
+									x: Math.round(x), 
+									y: Math.round(y), 
+									z: z // Сохраняем Z координату
+								},
+								text: markerName,
+								type: markerType,
+								color: markerColor,
+								marker: markerObj,
+								textLabel: textLabel,
+								originalData: originalData // Сохраняем ВСЕ оригинальные данные как есть
+							};
 
                             markerObj.on('dblclick', () => {
                                 this.editMarker(markerData);
@@ -2591,83 +2691,83 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
 
     // Подготовка данных для экспорта в совместимом формате
     prepareExportData(markersToExport = null) {
-        const markers = markersToExport || this.markers;
-        
-        const servers = [{
-            param1: "ip:port", // Пустой param1 как в оригинальном файле
-            param2: markers.map(marker => {
-                // Если есть оригинальные данные, используем их КАК ЕСТЬ
-                if (marker.originalData) {
-                    // Обновляем только изменяемые поля
-                    const updatedData = { ...marker.originalData };
-                    updatedData.name = marker.text;
-                    updatedData.icon = this.getIconPathFromType(marker.type);
-                    
-                    // Обновляем координаты
-                    updatedData.position = [
-                        marker.gameCoords.x,
-                        marker.originalData.position ? marker.originalData.position[1] : 0, // Сохраняем оригинальную Z координату
-                        marker.gameCoords.y
-                    ];
-                    
-                    // Обновляем цвет если он изменился
-                    const colorComponents = this.parseColorToComponents(marker.color);
-                    updatedData.colorR = colorComponents.r;
-                    updatedData.colorG = colorComponents.g;
-                    updatedData.colorB = colorComponents.b;
-                    
-                    // Проверяем и обрезаем UID если нужно
-                    if (updatedData.uid && updatedData.uid.toString().length > 10) {
-                        updatedData.uid = parseInt(updatedData.uid.toString().slice(0, 10));
-                    }
-                    
-                    return updatedData;
-                }
-                
-                // Иначе создаем данные из текущего состояния метки
-                const x = marker.gameCoords.x;
-                const y = marker.gameCoords.y;
-                const z = marker.gameCoords.z || 0; // Используем сохраненную Z координату
-                
-                // Получаем путь к иконке из типа метки
-                const iconPath = this.getIconPathFromType(marker.type);
-                
-                // Преобразуем цвет из RGB в компоненты
-                const colorComponents = this.parseColorToComponents(marker.color);
-                
-                // Проверяем и обрезаем UID если нужно
-                let uid = marker.id;
-                if (uid && uid.toString().length > 10) {
-                    uid = parseInt(uid.toString().slice(0, 10));
-                }
-                
-                // Создаем объект с базовыми параметрами
-                return {
-                    type: 5,
-                    uid: marker.id,
-                    name: marker.text,
-                    icon: iconPath,
-                    position: [x, z, y], // [x, z, y] - формат DayZ
-                    currentSubgroup: 0,
-                    colorA: 255,
-                    colorR: colorComponents.r,
-                    colorG: colorComponents.g,
-                    colorB: colorComponents.b,
-                    creatorSteamID: "",
-                    circleRadius: 0.0,
-                    circleColorA: 255,
-                    circleColorR: 255,
-                    circleColorG: 255,
-                    circleColorB: 255,
-                    circleStriked: 0,
-                    circleLayer: -1,
-                    showAllPlayerNametags: 0
-                };
-            })
-        }];
+		const markers = markersToExport || this.markers;
+		
+		const servers = [{
+			param1: "ip:port", // Пустой param1 как в оригинальном файле
+			param2: markers.map(marker => {
+				// Если есть оригинальные данные, используем их КАК ЕСТЬ
+				if (marker.originalData) {
+					// Обновляем только изменяемые поля
+					const updatedData = { ...marker.originalData };
+					updatedData.name = marker.text;
+					updatedData.icon = this.getIconPathFromType(marker.type);
+					
+					// Обновляем координаты (Z координата уже сохранена в originalData.position[1])
+					updatedData.position = [
+						marker.gameCoords.x,
+						marker.originalData.position ? marker.originalData.position[1] : (marker.gameCoords.z || 0), // Используем сохраненную Z координату
+						marker.gameCoords.y
+					];
+					
+					// Обновляем цвет если он изменился
+					const colorComponents = this.parseColorToComponents(marker.color);
+					updatedData.colorR = colorComponents.r;
+					updatedData.colorG = colorComponents.g;
+					updatedData.colorB = colorComponents.b;
+					
+					// Проверяем и обрезаем UID если нужно
+					if (updatedData.uid && updatedData.uid.toString().length > 10) {
+						updatedData.uid = parseInt(updatedData.uid.toString().slice(0, 10));
+					}
+					
+					return updatedData;
+				}
+				
+				// Иначе создаем данные из текущего состояния метки
+				const x = marker.gameCoords.x;
+				const y = marker.gameCoords.y;
+				const z = marker.gameCoords.z || 0; // Используем сохраненную Z координату
+				
+				// Получаем путь к иконке из типа метки
+				const iconPath = this.getIconPathFromType(marker.type);
+				
+				// Преобразуем цвет из RGB в компоненты
+				const colorComponents = this.parseColorToComponents(marker.color);
+				
+				// Проверяем и обрезаем UID если нужно
+				let uid = marker.id;
+				if (uid && uid.toString().length > 10) {
+					uid = parseInt(uid.toString().slice(0, 10));
+				}
+				
+				// Создаем объект с базовыми параметрами
+				return {
+					type: 5,
+					uid: marker.id,
+					name: marker.text,
+					icon: iconPath,
+					position: [x, z, y], // [x, z, y] - формат DayZ (Z координата включена)
+					currentSubgroup: 0,
+					colorA: 255,
+					colorR: colorComponents.r,
+					colorG: colorComponents.g,
+					colorB: colorComponents.b,
+					creatorSteamID: "",
+					circleRadius: 0.0,
+					circleColorA: 255,
+					circleColorR: 255,
+					circleColorG: 255,
+					circleColorB: 255,
+					circleStriked: 0,
+					circleLayer: -1,
+					showAllPlayerNametags: 0
+				};
+			})
+		}];
 
-        return servers;
-    }
+		return servers;
+	}
 
     // Получение пути к иконке из типа метки
     getIconPathFromType(type) {
@@ -2752,9 +2852,482 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
         
         this.showSuccess(`Экспортировано ${this.markers.length} меток`);
     }
+	
+	createDraggableModal(title, content, onClose = null) {
+		// Создаем оверлей
+		let overlay = document.querySelector('.modal-overlay');
+		if (!overlay) {
+			overlay = document.createElement('div');
+			overlay.className = 'modal-overlay';
+			document.body.appendChild(overlay);
+		}
+		overlay.classList.add('active');
+
+		// Создаем модальное окно
+		const modal = document.createElement('div');
+		modal.className = 'marker-modal';
+		
+		// Адаптивные размеры с увеличенной шириной
+		const isMobile = window.innerWidth <= 480;
+		const isSmallHeight = window.innerHeight <= 600;
+		
+		let modalWidth = 450; // Увеличили базовую ширину
+		let modalHeight = 'auto';
+		let topPosition = '50%';
+		
+		if (isMobile) {
+			modalWidth = Math.min(380, window.innerWidth - 40);
+			topPosition = '20px';
+		}
+		
+		if (isSmallHeight) {
+			topPosition = '10px';
+			modalHeight = 'calc(100vh - 20px)';
+		}
+
+		modal.style.cssText = `
+			position: fixed;
+			top: ${topPosition};
+			left: 50%;
+			transform: translate(-50%, ${isMobile || isSmallHeight ? '0' : '-50%'});
+			width: ${modalWidth}px;
+			height: ${modalHeight};
+			max-width: 95vw;
+			max-height: ${isSmallHeight ? '98vh' : '90vh'};
+			overflow: hidden;
+		`;
+
+		modal.innerHTML = `
+			<div class="modal-header">
+				<h3>${title}</h3>
+				<button class="modal-close">×</button>
+			</div>
+			<div class="modal-content">
+				${content}
+			</div>
+		`;
+
+		document.body.appendChild(modal);
+
+		// Добавляем функционал перетаскивания (только для десктопных размеров)
+		if (!isMobile) {
+			this.makeDraggable(modal);
+		}
+
+		// Обработчики событий
+		const closeHandler = () => {
+			this.closeModal(modal);
+			if (onClose) onClose();
+		};
+
+		const closeBtn = modal.querySelector('.modal-close');
+		closeBtn.addEventListener('click', closeHandler);
+
+		// Закрытие по клику на оверлей
+		const overlayHandler = (e) => {
+			if (e.target === overlay) {
+				closeHandler();
+			}
+		};
+		overlay.addEventListener('click', overlayHandler);
+
+		// Закрытие по ESC
+		const keyHandler = (e) => {
+			if (e.key === 'Escape') {
+				closeHandler();
+			}
+		};
+		document.addEventListener('keydown', keyHandler);
+
+		// Сохраняем обработчики
+		this.modalCloseHandlers.set(modal, {
+			closeHandler: () => {
+				closeBtn.removeEventListener('click', closeHandler);
+				overlay.removeEventListener('click', overlayHandler);
+				document.removeEventListener('keydown', keyHandler);
+				overlay.classList.remove('active');
+			}
+		});
+
+		return modal;
+	}
+	
+	makeDraggable(element) {
+		const header = element.querySelector('.modal-header');
+		let isDragging = false;
+		let startX, startY, initialX, initialY;
+
+		// Сохраняем начальную позицию
+		const rect = element.getBoundingClientRect();
+		initialX = rect.left;
+		initialY = rect.top;
+
+		header.addEventListener('mousedown', dragStart);
+		document.addEventListener('mousemove', drag);
+		document.addEventListener('mouseup', dragEnd);
+
+		function dragStart(e) {
+			if (e.target.classList.contains('modal-close')) return;
+			
+			isDragging = true;
+			
+			// Получаем текущую позицию элемента
+			const currentRect = element.getBoundingClientRect();
+			initialX = currentRect.left;
+			initialY = currentRect.top;
+			
+			// Запоминаем позицию курсора относительно элемента
+			startX = e.clientX - initialX;
+			startY = e.clientY - initialY;
+			
+			// Добавляем класс для визуальной обратной связи
+			element.style.transition = 'none';
+			header.style.cursor = 'grabbing';
+		}
+
+		function drag(e) {
+			if (!isDragging) return;
+			
+			e.preventDefault();
+			
+			// Вычисляем новую позицию
+			const newX = e.clientX - startX;
+			const newY = e.clientY - startY;
+			
+			// Устанавливаем новую позицию
+			element.style.left = newX + 'px';
+			element.style.top = newY + 'px';
+			element.style.transform = 'none';
+		}
+
+		function dragEnd() {
+			if (!isDragging) return;
+			
+			isDragging = false;
+			header.style.cursor = 'move';
+			element.style.transition = '';
+		}
+
+		// Сохраняем обработчики для очистки
+		const dragHandlers = {
+			dragStart: dragStart,
+			drag: drag,
+			dragEnd: dragEnd
+		};
+		
+		this.modalCloseHandlers.set(element, {
+			...this.modalCloseHandlers.get(element),
+			dragHandlers
+		});
+	}
+	
+	// Метод для парсинга координат из формата DayZ
+	parseDayZCoordinates(coordsString) {
+		try {
+			// Регулярное выражение для извлечения чисел из формата: <6643.34 345.259 6601.01> 160.805 Degree
+			const regex = /<([\d.]+)\s+([\d.]+)\s+([\d.]+)>\s+([\d.]+)\s+Degree/;
+			const match = coordsString.match(regex);
+			
+			if (!match) {
+				throw new Error('Неверный формат координат');
+			}
+			
+			const x = parseFloat(match[1]);
+			const z = parseFloat(match[2]); // Высота (Z координата)
+			const y = parseFloat(match[3]);
+			const degree = parseFloat(match[4]);
+			
+			// Валидация координат
+			if (isNaN(x) || isNaN(y) || isNaN(z) || isNaN(degree)) {
+				throw new Error('Координаты содержат нечисловые значения');
+			}
+			
+			if (x < 0 || x > CONFIG.mapPixelWidth || y < 0 || y > CONFIG.mapPixelHeight) {
+				throw new Error(`Координаты должны быть в пределах: X: 0-${CONFIG.mapPixelWidth}, Y: 0-${CONFIG.mapPixelHeight}`);
+			}
+			
+			return { x, y, z, degree };
+		} catch (error) {
+			console.error('Ошибка парсинга координат:', error);
+			throw error;
+		}
+	}
+
+	// Метод для центрирования карты на координатах DayZ
+	centerOnDayZCoords() {
+		const coordsInput = document.getElementById('dayzCoordsInput');
+		if (!coordsInput) {
+			this.showError('Поле для ввода координат не найдено');
+			return;
+		}
+
+		const coordsString = coordsInput.value.trim();
+		if (!coordsString) {
+			this.showError('Введите координаты в формате: <X Z Y> Degree');
+			return;
+		}
+
+		try {
+			const { x, y, z } = this.parseDayZCoordinates(coordsString);
+			
+			// Преобразуем игровые координаты в Leaflet координаты
+			const leafletLatLng = this.gameToLeafletCoords(x, y);
+			
+			// Центрируем карту с зумом 8
+			this.map.setView(leafletLatLng, 8);
+			
+			this.showSuccess(`Центрировано на координатах: X:${x} Y:${y} Z:${z}`);
+			
+		} catch (error) {
+			this.showError(error.message);
+		}
+	}
+
+	// Метод "Я тут" - центрирование и открытие окна добавления метки
+	imHereAtDayZCoords() {
+		const coordsInput = document.getElementById('dayzCoordsInput');
+		if (!coordsInput) {
+			this.showError('Поле для ввода координат не найдено');
+			return;
+		}
+
+		const coordsString = coordsInput.value.trim();
+		if (!coordsString) {
+			this.showError('Введите координаты в формате: <X Z Y> Degree');
+			return;
+		}
+
+		try {
+			const { x, y, z } = this.parseDayZCoordinates(coordsString);
+			
+			// Преобразуем игровые координаты в Leaflet координаты
+			const leafletLatLng = this.gameToLeafletCoords(x, y);
+			
+			// Центрируем карту с зумом 8
+			this.map.setView(leafletLatLng, 8);
+			
+			// Создаем объект координат с Z значением
+			const gameCoords = { x: x, y: y, z: z };
+			
+			// Показываем модальное окно для создания метки
+			this.showAddMarkerModal(leafletLatLng, gameCoords);
+			
+			this.showSuccess(`Готово к добавлению метки: X:${x} Y:${y} Z:${z}`);
+			
+		} catch (error) {
+			this.showError(error.message);
+		}
+	}
+	
+	// Метод для переключения сортировки
+    toggleSort(field) {
+		if (this.currentSort.field === field) {
+			// Циклическое переключение: нет → asc → desc → нет
+			if (this.currentSort.direction === 'asc') {
+				this.currentSort.direction = 'desc';
+			} else if (this.currentSort.direction === 'desc') {
+				// Сбрасываем сортировку
+				this.currentSort.field = null;
+				this.currentSort.direction = null;
+			}
+		} else {
+			// Новая сортировка - начинаем с asc
+			this.currentSort.field = field;
+			this.currentSort.direction = 'asc';
+		}
+	}
+
+    // Метод для обновления внешнего вида кнопок сортировки
+    updateSortButtons() {
+		document.querySelectorAll('.sort-btn').forEach(btn => {
+			const sortField = btn.dataset.sort;
+			
+			// Убираем все классы
+			btn.classList.remove('active', 'asc', 'desc');
+			
+			// Если это активная кнопка сортировки
+			if (sortField === this.currentSort.field) {
+				btn.classList.add('active', this.currentSort.direction);
+			}
+		});
+	}
+	
+	// Метод для сортировки меток
+    sortMarkers(markers) {
+		// Если сортировка не активна, возвращаем исходный порядок
+		if (!this.currentSort.field || !this.currentSort.direction) {
+			return markers;
+		}
+
+		const { field, direction } = this.currentSort;
+		const directionMultiplier = direction === 'asc' ? 1 : -1;
+
+		return [...markers].sort((a, b) => {
+			switch (field) {
+				case 'name':
+					return this.compareStrings(a.text, b.text) * directionMultiplier;
+				
+				case 'x':
+					return this.compareNumbers(a.gameCoords.x, b.gameCoords.x) * directionMultiplier;
+				
+				case 'y':
+					return this.compareNumbers(a.gameCoords.y, b.gameCoords.y) * directionMultiplier;
+				
+				default:
+					return 0;
+			}
+		});
+	}
+	
+	// Вспомогательные методы для сравнения
+    compareStrings(a, b) {
+        const strA = (a || '').toLowerCase();
+        const strB = (b || '').toLowerCase();
+        return strA.localeCompare(strB);
+    }
+
+    compareNumbers(a, b) {
+        return (a || 0) - (b || 0);
+    }
+	
+	// Метод для показа подсказки по координатам
+	showCoordsHelp() {
+		// Удаляем старый тултип если есть
+		const oldTooltip = document.querySelector('.help-tooltip');
+		if (oldTooltip) {
+			oldTooltip.remove();
+		}
+
+		const tooltip = document.createElement('div');
+		tooltip.className = 'help-tooltip';
+		tooltip.innerHTML = 'Подходит для установки меток например после прочтения документов или писем с координатами клада.';
+		
+		// Добавляем тултип в DOM сначала чтобы получить его размеры
+		document.body.appendChild(tooltip);
+		
+		// Позиционируем тултип под кнопкой
+		const helpBtn = document.getElementById('coordsHelpBtn');
+		const rect = helpBtn.getBoundingClientRect();
+		const tooltipHeight = tooltip.offsetHeight;
+		
+		tooltip.style.position = 'fixed';
+		tooltip.style.top = (rect.bottom + 10) + 'px'; // Позиционируем под кнопкой
+		tooltip.style.left = (rect.left + rect.width / 2 - tooltip.offsetWidth / 2) + 'px'; // Центрируем
+		
+		// Обработчик для закрытия при клике вне тултипа
+		const clickHandler = (e) => {
+			if (!tooltip.contains(e.target) && e.target !== helpBtn) {
+				if (tooltip.parentNode) {
+					tooltip.parentNode.removeChild(tooltip);
+				}
+				document.removeEventListener('click', clickHandler);
+			}
+		};
+
+		// Обработчик для закрытия по ESC
+		const keyHandler = (e) => {
+			if (e.key === 'Escape') {
+				if (tooltip.parentNode) {
+					tooltip.parentNode.removeChild(tooltip);
+				}
+				document.removeEventListener('keydown', keyHandler);
+				document.removeEventListener('click', clickHandler);
+			}
+		};
+
+		// Добавляем обработчики
+		setTimeout(() => {
+			document.addEventListener('click', clickHandler);
+			document.addEventListener('keydown', keyHandler);
+		}, 100);
+		
+		// Автоматическое скрытие через 8 секунд
+		const autoClose = setTimeout(() => {
+			if (tooltip.parentNode) {
+				tooltip.parentNode.removeChild(tooltip);
+				document.removeEventListener('click', clickHandler);
+				document.removeEventListener('keydown', keyHandler);
+			}
+		}, 8000);
+
+		// Сохраняем ID таймера для очистки при ручном закрытии
+		tooltip.autoCloseId = autoClose;
+	}
+	
+	// Метод для показа второй подсказки по координатам
+	showCoordsHelp2() {
+		// Удаляем старый тултип если есть
+		const oldTooltip = document.querySelector('.help-tooltip');
+		if (oldTooltip) {
+			oldTooltip.remove();
+		}
+
+		const tooltip = document.createElement('div');
+		tooltip.className = 'help-tooltip';
+		tooltip.innerHTML = 'Откройте карту в игре DayZ, на вкладке "Информация" слева внизу нажмите "Копировать координаты", вставьте координаты в поле "X Z Y Degree"';
+		
+		// Добавляем тултип в DOM сначала чтобы получить его размеры
+		document.body.appendChild(tooltip);
+		
+		// Позиционируем тултип под кнопкой
+		const helpBtn = document.getElementById('coordsHelpBtn2');
+		const rect = helpBtn.getBoundingClientRect();
+		const tooltipHeight = tooltip.offsetHeight;
+		
+		tooltip.style.position = 'fixed';
+		tooltip.style.top = (rect.bottom + 10) + 'px'; // Позиционируем под кнопкой
+		tooltip.style.left = (rect.left + rect.width / 2 - tooltip.offsetWidth / 2) + 'px'; // Центрируем
+		
+		// Обработчик для закрытия при клике вне тултипа
+		const clickHandler = (e) => {
+			if (!tooltip.contains(e.target) && e.target !== helpBtn) {
+				if (tooltip.parentNode) {
+					tooltip.parentNode.removeChild(tooltip);
+				}
+				document.removeEventListener('click', clickHandler);
+			}
+		};
+
+		// Обработчик для закрытия по ESC
+		const keyHandler = (e) => {
+			if (e.key === 'Escape') {
+				if (tooltip.parentNode) {
+					tooltip.parentNode.removeChild(tooltip);
+				}
+				document.removeEventListener('keydown', keyHandler);
+				document.removeEventListener('click', clickHandler);
+			}
+		};
+
+		// Добавляем обработчики
+		setTimeout(() => {
+			document.addEventListener('click', clickHandler);
+			document.addEventListener('keydown', keyHandler);
+		}, 100);
+		
+		// Автоматическое скрытие через 8 секунд
+		const autoClose = setTimeout(() => {
+			if (tooltip.parentNode) {
+				tooltip.parentNode.removeChild(tooltip);
+				document.removeEventListener('click', clickHandler);
+				document.removeEventListener('keydown', keyHandler);
+			}
+		}, 8000);
+
+		// Сохраняем ID таймера для очистки при ручном закрытии
+		tooltip.autoCloseId = autoClose;
+	}
+	
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM загружен, создаем карту...');
     window.dayzMap = new DayZMap();
+    
+    // Инициализируем кнопки сортировки после создания карты
+    setTimeout(() => {
+        if (window.dayzMap) {
+            window.dayzMap.updateSortButtons();
+        }
+    }, 100);
 });

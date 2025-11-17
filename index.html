@@ -19,6 +19,15 @@
                     <input type="number" id="coordX" placeholder="X" min="0" max="15360">
                     <input type="number" id="coordY" placeholder="Y" min="0" max="15360">
                     <button id="addMarkerByCoords">Добавить по координатам</button>
+					<button id="coordsHelpBtn" class="help-btn" title="Подсказка по использованию координат">?</button>
+                </div>
+				<div class="control-separator"></div>
+                <!-- Новое поле для ввода координат в формате DayZ -->
+                <div class="coord-inputs">
+                    <input type="text" id="dayzCoordsInput" placeholder="X Z Y Degree" style="width: 200px;">
+                    <button id="centerCoordsBtn">Центрировать</button>
+                    <button id="imHereBtn">Воткнуть метку</button>
+					<button id="coordsHelpBtn2" class="help-btn" title="Подсказка по использованию координат">?</button>
                 </div>
 				<div class="control-separator"></div>
             </div>
@@ -78,7 +87,20 @@
             </div>
             
             <div class="markers-list">
-                <h3>Мои метки</h3>
+                <div class="sort-controls">
+                    <h3>Мои метки</h3>
+                    <div class="sort-buttons">
+                        <button class="sort-btn" data-sort="name" title="Сортировка по имени">
+							<span>Имя</span>
+                        </button>
+                        <button class="sort-btn" data-sort="x" title="Сортировка по X координате">
+							<span>X</span>
+                        </button>
+                        <button class="sort-btn" data-sort="y" title="Сортировка по Y координате">
+							<span>Y</span>
+                        </button>
+                    </div>
+                </div>
                 <div id="markersContainer"></div>
             </div>
          
