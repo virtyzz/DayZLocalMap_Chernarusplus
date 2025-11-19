@@ -39,44 +39,56 @@
         
         <div class="sidebar">
             <div class="markers-search">
+				<div class="search-hint-v1">
+					<details>
+						<summary><b>Подсказка:</b></summary>
+						<div class="search-hint" style="font-size: 11px; color: #7f8c8d; margin-top: 5px; padding: 5px; background: #f8f9fa; border-radius: 3px;">
+							Пробел = И, | = ИЛИ, кавычки для точной фразы<br>						
+							<br>Одно слово: дом - обычный поиск<br>
+							<br>Несколько слов (И): мой дом - найдет метки, содержащие И "мой" И "дом"<br>
+							<br>Оператор ИЛИ: дом|склад - найдет метки, содержащие ИЛИ "дом" ИЛИ "склад"<br>
+							<br>Точная фраза: "мой дом" - найдет точное совпадение фразы<br>
+						</div>
+					</details>
+				</div>
                 <input type="text" id="searchMarkers" placeholder="Поиск меток по названию...">
 				<select id="searchType">
 					<option value="">Все типы</option>
 					<option value="default">Обычный маркер</option>
 					<option value="cross">X</option>
-					<option value="home">Дом</option>
-					<option value="camp">Лагерь</option>
-					<option value="safezone">Безопасная зона</option>
-					<option value="blackmarket">Черный рынок</option>
-					<option value="hospital">Госпиталь</option>
-					<option value="sniper">Снайпер</option>
-					<option value="player">Игрок</option>
-					<option value="flag">Флаг</option>
-					<option value="star">Звезда</option>
-					<option value="car">Автомобиль</option>
-					<option value="parking">Парковка</option>
-					<option value="heli">Вертолет</option>
-					<option value="rail">Железная дорога</option>
-					<option value="ship">Корабль</option>
-					<option value="scooter">Скутер</option>
-					<option value="bank">Банк</option>
-					<option value="restaurant">Ресторан</option>
-					<option value="post">Почта</option>
-					<option value="castle">Замок</option>
-					<option value="ranger-station">Станция рейнджера</option>
-					<option value="water">Вода</option>
-					<option value="triangle">Треугольник</option>
-					<option value="cow">Корова</option>
-					<option value="bear">Медведь</option>
-					<option value="car-repair">Ремонт авто</option>
-					<option value="communications">Коммуникации</option>
-					<option value="roadblock">Блокпост</option>
-					<option value="stadium">Стадион</option>
-					<option value="skull">Череп</option>
-					<option value="rocket">Ракета</option>
-					<option value="bbq">BBQ</option>
-					<option value="ping">Пинг</option>
-					<option value="circle">Круг</option>
+					<option value="home">Дом H</option>
+					<option value="camp">Лагерь C</option>
+					<option value="safezone">Безопасная зона S</option>
+					<option value="blackmarket">Черный рынок B</option>
+					<option value="hospital">Госпиталь +</option>
+					<option value="sniper">Снайпер ⊙</option>
+					<option value="player">Игрок P</option>
+					<option value="flag">Флаг ⚑</option>
+					<option value="star">Звезда ★</option>
+					<option value="car">Автомобиль 🚗</option>
+					<option value="parking">Парковка P</option>
+					<option value="heli">Вертолет 🚁</option>
+					<option value="rail">Железная дорога 🚆</option>
+					<option value="ship">Корабль ⛴</option>
+					<option value="scooter">Скутер 🛵</option>
+					<option value="bank">Банк 💳</option>
+					<option value="restaurant">Ресторан 🍴</option>
+					<option value="post">Почта ✉</option>
+					<option value="castle">Замок 🏰</option>
+					<option value="ranger-station">Станция рейнджера 🌲</option>
+					<option value="water">Вода 💧</option>
+					<option value="triangle">Треугольник ▲</option>
+					<option value="cow">Корова 🐄</option>
+					<option value="bear">Медведь 🐻</option>
+					<option value="car-repair">Ремонт авто 🔧</option>
+					<option value="communications">Коммуникации 📡</option>
+					<option value="roadblock">Блокпост 🚧</option>
+					<option value="stadium">Стадион 🏟</option>
+					<option value="skull">Череп 💀</option>
+					<option value="rocket">Ракета 🚀</option>
+					<option value="bbq">BBQ 🍖</option>
+					<option value="ping">Пинг 📍</option>
+					<option value="circle">Круг ●</option>
 				</select>
                 <div class="search-buttons">
                     <button id="searchBtn">Поиск</button>

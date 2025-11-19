@@ -48,7 +48,7 @@ body {
     flex-wrap: wrap;
 }
 
-/* ОБНОВЛЕННЫЕ СТИЛИ КНОПОК - УВЕЛИЧЕНА СПЕЦИФИЧНОСТЬ */
+/* Базовые стили для элементов управления */
 .controls button, .controls select, .controls input {
     padding: 6px 10px;
     color: white;
@@ -59,7 +59,7 @@ body {
     font-size: 0.9em;
 }
 
-/* Базовый цвет для кнопок */
+/* Базовые цвета для кнопок */
 .controls button:not(.help-btn) {
     background-color: #34495e;
 }
@@ -68,47 +68,38 @@ body {
     background-color: #4a6572;
 }
 
-/* Специфичные кнопки с приоритетом */
-.controls button#addMarkerBtn {
+/* Специфичные кнопки */
+.controls button#addMarkerBtn,
+.controls button#searchBtn,
+.controls button#addMarkerByCoords,
+.controls button#imHereBtn {
     background-color: #3498db !important;
 }
-.controls button#addMarkerBtn:hover {
+
+.controls button#addMarkerBtn:hover,
+.controls button#searchBtn:hover,
+.controls button#addMarkerByCoords:hover,
+.controls button#imHereBtn:hover {
     background-color: #2980b9 !important;
 }
 
 .controls button#clearMarkersBtn {
     background-color: #e74c3c !important;
 }
+
 .controls button#clearMarkersBtn:hover {
     background-color: #c0392b !important;
 }
 
-.controls button#searchBtn {
-    background-color: #3498db !important;
-}
-.controls button#searchBtn:hover {
-    background-color: #2980b9 !important;
-}
-
-/* Кнопки координат */
-.controls button#addMarkerByCoords,
-.controls button#imHereBtn {
-    background-color: #3498db !important;
-}
-.controls button#addMarkerByCoords:hover,
-.controls button#imHereBtn:hover {
-    background-color: #2980b9 !important;
-}
-
-/* Кнопка центрирования остается фиолетовой */
 .controls button#centerCoordsBtn {
     background-color: #9b59b6 !important;
 }
+
 .controls button#centerCoordsBtn:hover {
     background-color: #8e44ad !important;
 }
 
-/* Стиль для кнопки экспорта */
+/* Кнопка экспорта */
 .controls button:last-child:not(.help-btn) {
     background-color: #f39c12 !important;
 }
@@ -117,15 +108,12 @@ body {
     background-color: #e67e22 !important;
 }
 
-.controls input {
-    flex-grow: 1;
-    min-width: 150px;
-    background-color: #34495e;
-}
-
-/* Стили для полей ввода и селектов */
+/* Поля ввода и селекты */
+.controls input,
 .controls select {
     background-color: #34495e;
+    flex-grow: 1;
+    min-width: 150px;
 }
 
 .controls input:focus,
@@ -134,6 +122,7 @@ body {
     border-color: #3498db;
 }
 
+/* Основные контейнеры */
 .map-container {
     background-color: #2d2d2d;
     border-radius: 8px;
@@ -158,6 +147,7 @@ body {
     min-height: 0;
 }
 
+/* Поиск меток */
 .markers-search {
     padding: 12px;
     background: #2d2d2d;
@@ -194,40 +184,20 @@ body {
     min-width: 60px;
 }
 
-.search-buttons button#searchBtn {
-    background: #3498db !important;
-    color: white;
-}
+/* Цвета кнопок поиска */
+.search-buttons button#searchBtn { background: #3498db !important; }
+.search-buttons button#searchBtn:hover { background: #2980b9 !important; }
 
-.search-buttons button#searchBtn:hover {
-    background: #2980b9 !important;
-}
+.search-buttons button#showAllBtn { background: #27ae60 !important; }
+.search-buttons button#showAllBtn:hover { background: #229954 !important; }
 
-.search-buttons button#showAllBtn {
-    background: #27ae60 !important;
-    color: white;
+.search-buttons button#hideOthersBtn,
+.search-buttons button#exportFilteredBtn { 
+    background: #f39c12 !important; 
 }
-
-.search-buttons button#showAllBtn:hover {
-    background: #229954 !important;
-}
-
-.search-buttons button#hideOthersBtn {
-    background: #f39c12 !important;
-    color: white;
-}
-
-.search-buttons button#hideOthersBtn:hover {
-    background: #e67e22 !important;
-}
-
-.search-buttons button#exportFilteredBtn {
-    background: #f39c12 !important;
-    color: white;
-}
-
-.search-buttons button#exportFilteredBtn:hover {
-    background: #e67e22 !important;
+.search-buttons button#hideOthersBtn:hover,
+.search-buttons button#exportFilteredBtn:hover { 
+    background: #e67e22 !important; 
 }
 
 .search-buttons button:disabled {
@@ -236,6 +206,7 @@ body {
     opacity: 0.6;
 }
 
+/* Список меток */
 .markers-list {
     flex: 1;
     padding: 12px;
@@ -249,6 +220,8 @@ body {
     margin-bottom: 10px;
     color: #e74c3c;
     font-size: 1.1em;
+    display: flex;
+    align-items: center;
 }
 
 #markersContainer {
@@ -256,6 +229,7 @@ body {
     overflow-y: auto;
 }
 
+/* Элемент метки - ОПТИМИЗИРОВАНО: объединены дублирующиеся стили */
 .marker-item {
     background-color: #34495e;
     padding: 8px;
@@ -266,6 +240,56 @@ body {
     justify-content: space-between;
     align-items: center;
     font-size: 0.9em;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.marker-item:hover {
+    background-color: #3d566e !important;
+    transform: translateX(2px);
+}
+
+.marker-item.selected {
+    background-color: #2c3e50 !important;
+    border-left: 6px solid #f39c12 !important; /* Увеличили толщину и яркость */
+    transform: scale(1.02);
+    box-shadow: 0 2px 8px rgba(243, 156, 18, 0.4); /* Добавили свечение */
+    z-index: 1;
+    position: relative;
+}
+
+/* УБЕДИТЕСЬ, ЧТО ЦВЕТ ТЕКСТА ХОРОШО ЧИТАЕТСЯ */
+.marker-item.selected strong {
+    color: #ecf0f1 !important;
+}
+
+.marker-item.selected .coords {
+    color: #bdc3c7 !important;
+}
+
+.marker-item.selected .type {
+    color: #f39c12 !important; /* Оранжевый цвет для типа */
+    font-weight: bold;
+}
+
+/* Переопределение для выбранных меток - ВАЖНО: оранжевая полоса всегда ПРИОРИТЕТНА */
+.marker-item.selected {
+    border-left-color: #f39c12 !important;
+}
+
+/* Усилим анимацию подсветки на карте */
+.marker-highlighted {
+    animation: pulse 2s ease-in-out infinite; /* Бесконечная анимация */
+    z-index: 1000;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        filter: drop-shadow(0 0 5px rgba(243, 156, 18, 0.7));
+    }
+    50% {
+        filter: drop-shadow(0 0 20px rgba(243, 156, 18, 1));
+    }
 }
 
 .marker-item .coords {
@@ -287,67 +311,67 @@ body {
     border-radius: 3px;
     cursor: pointer;
     font-size: 0.8em;
+    transition: all 0.2s ease;
 }
 
 .marker-item .delete:hover {
     background-color: #e74c3c;
+    transform: scale(1.1);
 }
 
-/* Стили для разных типов меток */
-.marker-default { border-left-color: #3498db !important; }
-.marker-home { border-left-color: #e74c3c !important; }
-.marker-camp { border-left-color: #27ae60 !important; }
-.marker-safezone { border-left-color: #2ecc71 !important; }
-.marker-blackmarket { border-left-color: #34495e !important; }
-.marker-hospital { border-left-color: #e74c8c !important; }
-.marker-sniper { border-left-color: #c0392b !important; }
-.marker-player { border-left-color: #9b59b6 !important; }
-.marker-flag { border-left-color: #d35400 !important; }
-.marker-star { border-left-color: #f1c40f !important; }
-.marker-car { border-left-color: #16a085 !important; }
-.marker-parking { border-left-color: #7f8c8d !important; }
-.marker-heli { border-left-color: #2980b9 !important; }
-.marker-rail { border-left-color: #8e44ad !important; }
-.marker-ship { border-left-color: #3498db !important; }
-.marker-scooter { border-left-color: #1abc9c !important; }
-.marker-bank { border-left-color: #f39c12 !important; }
-.marker-restaurant { border-left-color: #e67e22 !important; }
-.marker-post { border-left-color: #95a5a6 !important; }
-.marker-castle { border-left-color: #7d3c98 !important; }
-.marker-ranger-station { border-left-color: #27ae60 !important; }
-.marker-water { border-left-color: #3498db !important; }
-.marker-triangle { border-left-color: #e74c3c !important; }
-.marker-cow { border-left-color: #8b4513 !important; }
-.marker-bear { border-left-color: #2c3e50 !important; }
-.marker-car-repair { border-left-color: #d35400 !important; }
-.marker-communications { border-left-color: #9b59b6 !important; }
-.marker-roadblock { border-left-color: #c0392b !important; }
-.marker-stadium { border-left-color: #f1c40f !important; }
-.marker-skull { border-left-color: #2c3e50 !important; }
-.marker-rocket { border-left-color: #e74c3c !important; }
-.marker-bbq { border-left-color: #d35400 !important; }
-.marker-ping { border-left-color: #2ecc71 !important; }
-.marker-circle { border-left-color: #3498db !important; }
-.marker-cross { border-left-color: #3498db !important; }
+/* Цвета типов меток - ОПТИМИЗИРОВАНО: убран !important где возможно */
+.marker-default { border-left-color: #3498db; }
+.marker-home { border-left-color: #e74c3c; }
+.marker-camp { border-left-color: #27ae60; }
+.marker-safezone { border-left-color: #2ecc71; }
+.marker-blackmarket { border-left-color: #34495e; }
+.marker-hospital { border-left-color: #e74c8c; }
+.marker-sniper { border-left-color: #c0392b; }
+.marker-player { border-left-color: #9b59b6; }
+.marker-flag { border-left-color: #d35400; }
+.marker-star { border-left-color: #f1c40f; }
+.marker-car { border-left-color: #16a085; }
+.marker-parking { border-left-color: #7f8c8d; }
+.marker-heli { border-left-color: #2980b9; }
+.marker-rail { border-left-color: #8e44ad; }
+.marker-ship { border-left-color: #3498db; }
+.marker-scooter { border-left-color: #1abc9c; }
+.marker-bank { border-left-color: #f39c12; }
+.marker-restaurant { border-left-color: #e67e22; }
+.marker-post { border-left-color: #95a5a6; }
+.marker-castle { border-left-color: #7d3c98; }
+.marker-ranger-station { border-left-color: #27ae60; }
+.marker-water { border-left-color: #3498db; }
+.marker-triangle { border-left-color: #e74c3c; }
+.marker-cow { border-left-color: #8b4513; }
+.marker-bear { border-left-color: #2c3e50; }
+.marker-car-repair { border-left-color: #d35400; }
+.marker-communications { border-left-color: #9b59b6; }
+.marker-roadblock { border-left-color: #c0392b; }
+.marker-stadium { border-left-color: #f1c40f; }
+.marker-skull { border-left-color: #2c3e50; }
+.marker-rocket { border-left-color: #e74c3c; }
+.marker-bbq { border-left-color: #d35400; }
+.marker-ping { border-left-color: #2ecc71; }
+.marker-circle,
+.marker-cross { border-left-color: #3498db; }
 
-/* Кастомные иконки для Leaflet */
-.custom-marker {
-    background: none;
-    border: none;
+/* Переопределение для выбранных меток - ВАЖНО: оранжевая полоса всегда */
+.marker-item.selected {
+    border-left-color: #f39c12 !important;
+}
+
+/* Leaflet стили */
+.custom-marker,
+.marker-popup,
+.grid-label,
+.leaflet-div-icon {
+    background: none !important;
+    border: none !important;
 }
 
 .marker-popup {
     font-family: 'Arial', sans-serif;
-}
-
-.grid-label {
-    background: none !important;
-    border: none !important;
-}
-
-.leaflet-div-icon {
-    background: none !important;
-    border: none !important;
 }
 
 .no-results {
@@ -389,14 +413,6 @@ body {
     color: #bdc3c7;
 }
 
-.markers-list h3 {
-    margin-bottom: 10px;
-    color: #e74c3c;
-    font-size: 1.1em;
-    display: flex;
-    align-items: center;
-}
-
 #markersCounter {
     color: #95a5a6;
     font-size: 0.9em;
@@ -409,16 +425,17 @@ body {
     color: #bdc3c7;
 }
 
-#map-axes-container {
+/* Оси карты */
+#map-axes-container,
+.axis-label {
     pointer-events: none !important;
 }
 
 .axis-label {
-    pointer-events: none !important;
     z-index: 500 !important;
 }
 
-/* Стили для полей ввода координат */
+/* Координатные поля */
 .coord-inputs {
     display: flex;
     gap: 5px;
@@ -436,6 +453,10 @@ body {
     font-size: 0.9em;
 }
 
+.coord-inputs input[type="text"] {
+    width: 200px;
+}
+
 .coord-inputs button {
     padding: 6px 10px;
     border: none;
@@ -445,7 +466,7 @@ body {
     white-space: nowrap;
 }
 
-/* Стили для разделителей */
+/* Разделители */
 .control-separator {
     width: 1px;
     height: 30px;
@@ -453,41 +474,22 @@ body {
     margin: 0 5px;
 }
 
-/* Адаптивность для мобильных устройств */
-@media (max-width: 768px) {
-    .container {
-        grid-template-columns: 1fr;
-        grid-template-rows: auto 1fr auto;
-    }
-    
-    .sidebar {
-        grid-column: 1;
-        max-height: 200px;
-    }
-    
-    .controls-row {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .controls {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .controls input {
-        min-width: auto;
-    }
-    
-    .control-separator {
-        width: 100%;
-        height: 1px;
-        margin: 4px 0;
-        background: #555;
-    }
+/* Модальные окна */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 9999;
+    display: none;
 }
 
-/* Стили для перемещаемых модальных окон */
+.modal-overlay.active {
+    display: block;
+}
+
 .marker-modal {
     position: fixed !important;
     background: #2d2d2d !important;
@@ -497,41 +499,12 @@ body {
     z-index: 10000 !important;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5) !important;
     user-select: none !important;
-    min-width: 420px !important;
-    max-width: 90vw !important;
-    max-height: 90vh !important;
+    min-width: 420px;
+    max-width: 90vw;
+    max-height: 90vh;
     padding: 0 !important;
     display: flex;
     flex-direction: column;
-}
-
-/* Адаптивность для увеличенной ширины */
-@media (max-width: 480px) {
-    .marker-modal {
-        min-width: 380px !important;
-        max-width: 95vw !important;
-    }
-    
-    .color-inputs {
-        flex-direction: column;
-        gap: 15px;
-    }
-    
-    .color-preview {
-        align-self: center;
-        width: 100px;
-        height: 80px;
-    }
-}
-
-@media (max-width: 400px) {
-    .marker-modal {
-        min-width: 350px !important;
-    }
-    
-    .color-inputs {
-        gap: 12px;
-    }
 }
 
 .modal-header {
@@ -608,23 +581,7 @@ body {
     background: #95a5a6;
 }
 
-/* Оверлей для модального окна */
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 9999;
-    display: none;
-}
-
-.modal-overlay.active {
-    display: block;
-}
-
-/* Стили для элементов внутри модального окна */
+/* Элементы модального окна */
 .modal-field {
     margin-bottom: 0;
 }
@@ -674,7 +631,7 @@ body {
     flex: 1;
 }
 
-/* Стили для модальных кнопок */
+/* Цвета кнопок модальных окон */
 .modal-buttons button {
     background: #34495e;
     color: white;
@@ -687,7 +644,6 @@ body {
 .modal-buttons button#saveNewMarker,
 .modal-buttons button#saveEdit {
     background: #27ae60 !important;
-    color: white;
 }
 
 .modal-buttons button#saveNewMarker:hover,
@@ -697,7 +653,6 @@ body {
 
 .modal-buttons button#deleteMarker {
     background: #e74c3c !important;
-    color: white;
 }
 
 .modal-buttons button#deleteMarker:hover {
@@ -707,7 +662,6 @@ body {
 .modal-buttons button#cancelNewMarker,
 .modal-buttons button#cancelEdit {
     background: #7f8c8d !important;
-    color: white;
 }
 
 .modal-buttons button#cancelNewMarker:hover,
@@ -715,7 +669,7 @@ body {
     background: #95a5a6 !important;
 }
 
-/* Цветовая палитра - компактная версия */
+/* Цветовая палитра */
 .color-palette-container {
     display: flex;
     flex-direction: column;
@@ -777,35 +731,258 @@ body {
     margin-top: 8px;
 }
 
-/* Медиа-запросы для маленьких экранов */
-@media (max-height: 800px) {
-    .marker-modal {
-        max-height: 95vh !important;
-        top: 50% !important;
-        transform: translate(-50%, -50%) !important;
+/* Анимации */
+.marker-highlighted {
+    animation: pulse 2s ease-in-out;
+    z-index: 1000;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        filter: drop-shadow(0 0 5px rgba(243, 156, 18, 0.7));
     }
-    
-    .modal-content {
-        padding: 15px;
-        gap: 12px;
-    }
-    
-    .modal-header {
-        padding: 12px 15px;
-    }
-    
-    .modal-field input,
-    .modal-field select {
-        padding: 8px;
-    }
-    
-    .modal-buttons button {
-        padding: 8px 12px;
-        font-size: 13px;
+    50% {
+        filter: drop-shadow(0 0 15px rgba(243, 156, 18, 1));
     }
 }
 
+/* Сортировка */
+.search-hint-v1 {
+	color: #e74c3c;
+    font-size: 1.1em;
+}
+
+.sort-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.sort-controls h3 {
+    margin: 0;
+    color: #e74c3c;
+    font-size: 1.1em;
+    text-align: center;
+}
+
+.sort-buttons {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+}
+
+.sort-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 12px;
+    color: white;
+    border: 1px solid #4a6572;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9em;
+    font-weight: bold;
+    transition: all 0.3s ease;
+    min-height: 40px;
+    position: relative;
+    background: #34495e !important;
+}
+
+.sort-btn.active {
+    background: #3498db !important;
+    border-color: #2980b9;
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
+}
+
+.sort-btn::before {
+    content: "";
+    font-size: 1em;
+    font-weight: bold;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.sort-btn.asc::before {
+    content: "↑";
+    opacity: 1;
+    color: white;
+}
+
+.sort-btn.desc::before {
+    content: "↓";
+    opacity: 1;
+    color: white;
+}
+
+/* Кнопки помощи */
+.coord-inputs .help-btn {
+    width: 24px !important;
+    height: 24px !important;
+    border-radius: 50% !important;
+    background: none !important;
+    color: #3498db !important;
+    border: 2px solid #3498db !important;
+    font-weight: bold !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 14px !important;
+    transition: all 0.3s ease !important;
+    flex-shrink: 0 !important;
+    margin-left: 5px !important;
+    padding: 0 !important;
+    min-width: auto !important;
+}
+
+.coord-inputs .help-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 8px rgba(52, 152, 219, 0.5);
+}
+
+/* Тултипы */
+.help-tooltip {
+    position: fixed;
+    background: rgba(0, 0, 0, 0.95);
+    color: white;
+    padding: 12px 15px;
+    border-radius: 8px;
+    border: 1px solid #3498db;
+    max-width: 280px;
+    z-index: 10000;
+    font-size: 13px;
+    line-height: 1.4;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+    pointer-events: none;
+    text-align: center;
+}
+
+.help-tooltip::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 6px solid #3498db;
+}
+
+/* Стили для активного фильтра */
+.search-active {
+    border: 2px solid #3498db !important;
+    background: #2c3e50 !important;
+}
+
+/* Подсветка активных полей фильтра */
+#searchMarkers:not(:placeholder-shown),
+#searchType:not([value=""]) {
+    border-color: #3498db !important;
+    background: #2c3e50 !important;
+}
+
+/* Поддержка */
+.support-info {
+    background: #2d2d2d;
+    padding: 8px;
+    margin: 5px 0;
+    border-radius: 5px;
+    border: 1px solid #444;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.support-text {
+    color: #ecf0f1;
+    font-size: 0.85em;
+    font-weight: bold;
+}
+
+.support-links {
+    display: flex;
+    gap: 8px;
+}
+
+.telegram-link, .github-link {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    color: white;
+    text-decoration: none;
+    border-radius: 3px;
+    transition: background-color 0.3s;
+    font-size: 0.8em;
+}
+
+.telegram-link {
+    background: #0088cc;
+}
+
+.telegram-link:hover {
+    background: #0077b3;
+}
+
+.github-link {
+    background: #333;
+}
+
+.github-link:hover {
+    background: #555;
+}
+
+/* Адаптивность */
 @media (max-width: 768px) {
+    .container {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr auto;
+    }
+    
+    .sidebar {
+        grid-column: 1;
+        max-height: 200px;
+    }
+    
+    .controls-row,
+    .controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .controls input {
+        min-width: auto;
+    }
+    
+    .control-separator {
+        width: 100%;
+        height: 1px;
+        margin: 4px 0;
+        background: #555;
+    }
+    
+    .coord-inputs {
+        flex-direction: column;
+        gap: 5px;
+    }
+    
+    .coord-inputs input[type="text"] {
+        width: 100%;
+    }
+    
+    .coord-inputs button {
+        width: 100%;
+    }
+    
+    .sort-btn {
+        padding: 6px 8px;
+        font-size: 0.85em;
+        min-height: 36px;
+    }
+    
     .marker-modal {
         min-width: 320px !important;
         max-width: 95vw !important;
@@ -831,6 +1008,66 @@ body {
     .color-rgb-row input {
         flex: 1;
         width: auto;
+    }
+}
+
+@media (max-width: 480px) {
+    .sort-btn {
+        padding: 5px 6px;
+        font-size: 0.8em;
+        min-height: 34px;
+    }
+    
+    .marker-modal {
+        min-width: 380px !important;
+    }
+    
+    .color-inputs {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .color-preview {
+        align-self: center;
+        width: 100px;
+        height: 80px;
+    }
+}
+
+@media (max-width: 400px) {
+    .marker-modal {
+        min-width: 350px !important;
+    }
+    
+    .color-inputs {
+        gap: 12px;
+    }
+}
+
+@media (max-height: 800px) {
+    .marker-modal {
+        max-height: 95vh !important;
+        top: 50% !important;
+        transform: translate(-50%, -50%) !important;
+    }
+    
+    .modal-content {
+        padding: 15px;
+        gap: 12px;
+    }
+    
+    .modal-header {
+        padding: 12px 15px;
+    }
+    
+    .modal-field input,
+    .modal-field select {
+        padding: 8px;
+    }
+    
+    .modal-buttons button {
+        padding: 8px 12px;
+        font-size: 13px;
     }
 }
 
@@ -889,271 +1126,4 @@ body {
         width: 60px;
         padding: 6px;
     }
-}
-
-/* Стили для подсветки выбранной метки */
-.marker-item.selected {
-    background-color: #2c3e50 !important;
-    border-left: 4px solid #f39c12 !important;
-    transform: scale(1.02);
-    transition: all 0.3s ease;
-}
-
-.marker-highlighted {
-    animation: pulse 2s ease-in-out;
-    z-index: 1000;
-}
-
-@keyframes pulse {
-    0% {
-        filter: drop-shadow(0 0 5px rgba(243, 156, 18, 0.7));
-    }
-    50% {
-        filter: drop-shadow(0 0 15px rgba(243, 156, 18, 1));
-    }
-    100% {
-        filter: drop-shadow(0 0 5px rgba(243, 156, 18, 0.7));
-    }
-}
-
-/* Улучшаем визуальную обратную связь при наведении */
-.marker-item {
-    transition: all 0.2s ease;
-    cursor: pointer;
-}
-
-.marker-item:hover {
-    background-color: #3d566e !important;
-    transform: translateX(2px);
-}
-
-.marker-item .delete {
-    transition: all 0.2s ease;
-}
-
-.marker-item .delete:hover {
-    background-color: #e74c3c;
-    transform: scale(1.1);
-}
-
-/* Стили для поля ввода DayZ координат */
-.coord-inputs input[type="text"] {
-    width: 200px;
-    padding: 6px;
-    background: #444;
-    color: white;
-    border: 1px solid #666;
-    border-radius: 3px;
-    font-size: 0.9em;
-}
-
-/* Адаптивность для мобильных устройств */
-@media (max-width: 768px) {
-    .coord-inputs {
-        flex-direction: column;
-        gap: 5px;
-    }
-    
-    .coord-inputs input[type="text"] {
-        width: 100%;
-    }
-    
-    .coord-inputs button {
-        width: 100%;
-    }
-}
-
-/* Стили для элементов сортировки */
-.sort-controls {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-bottom: 10px;
-}
-
-.sort-controls h3 {
-    margin: 0;
-    color: #e74c3c;
-    font-size: 1.1em;
-    text-align: center;
-}
-
-.sort-buttons {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-}
-
-.sort-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 8px 12px;
-    color: white;
-    border: 1px solid #4a6572;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 0.9em;
-    font-weight: bold;
-    transition: all 0.3s ease;
-    min-height: 40px;
-    position: relative;
-    background: #34495e !important;
-}
-
-/* Активная кнопка (подсветка фона) */
-.sort-btn.active {
-    background: #3498db !important;
-    border-color: #2980b9;
-    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
-}
-
-/* Стрелочка через псевдоэлемент */
-.sort-btn::before {
-    content: "";
-    font-size: 1em;
-    font-weight: bold;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-/* Стрелочка для asc */
-.sort-btn.asc::before {
-    content: "↑";
-    opacity: 1;
-    color: white;
-}
-
-/* Стрелочка для desc */
-.sort-btn.desc::before {
-    content: "↓";
-    opacity: 1;
-    color: white;
-}
-
-/* Адаптивность */
-@media (max-width: 768px) {
-    .sort-btn {
-        padding: 6px 8px;
-        font-size: 0.85em;
-        min-height: 36px;
-    }
-}
-
-@media (max-width: 480px) {
-    .sort-btn {
-        padding: 5px 6px;
-        font-size: 0.8em;
-        min-height: 34px;
-    }
-}
-
-/* Стили для кнопки помощи */
-.coord-inputs .help-btn {
-    width: 24px !important;
-    height: 24px !important;
-    border-radius: 50% !important;
-    background: none !important;
-    color: #3498db !important;
-    border: 2px solid #3498db !important;
-    font-weight: bold !important;
-    cursor: pointer !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    font-size: 14px !important;
-    transition: all 0.3s ease !important;
-    flex-shrink: 0 !important;
-    margin-left: 5px !important;
-    padding: 0 !important;
-    min-width: auto !important;
-}
-
-.coord-inputs .help-btn:hover {
-    background: none !important;
-    transform: scale(1.1) !important;
-    box-shadow: 0 0 8px rgba(52, 152, 219, 0.5) !important;
-    border-color: #3498db !important;
-    color: #3498db !important;
-}
-
-/* Стили для тултипа */
-.help-tooltip {
-    position: fixed;
-    background: rgba(0, 0, 0, 0.95);
-    color: white;
-    padding: 12px 15px;
-    border-radius: 8px;
-    border: 1px solid #3498db;
-    max-width: 280px;
-    z-index: 10000;
-    font-size: 13px;
-    line-height: 1.4;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
-    pointer-events: none;
-    text-align: center;
-}
-
-.help-tooltip::before {
-    content: '';
-    position: absolute;
-    top: -6px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 0;
-    height: 0;
-    border-left: 6px solid transparent;
-    border-right: 6px solid transparent;
-    border-bottom: 6px solid #3498db;
-}
-
-/* Блок с информацией о поддержке */
-.support-info {
-    background: #2d2d2d;
-    padding: 8px;
-    margin: 5px 0;
-    border-radius: 5px;
-    border: 1px solid #444;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.support-text {
-    color: #ecf0f1;
-    font-size: 0.85em;
-    font-weight: bold;
-}
-
-.support-links {
-    display: flex;
-    gap: 8px;
-}
-
-.telegram-link, .github-link {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 8px;
-    color: white;
-    text-decoration: none;
-    border-radius: 3px;
-    transition: background-color 0.3s;
-    font-size: 0.8em;
-}
-
-.telegram-link {
-    background: #0088cc;
-}
-
-.telegram-link:hover {
-    background: #0077b3;
-}
-
-.github-link {
-    background: #333;
-}
-
-.github-link:hover {
-    background: #555;
 }

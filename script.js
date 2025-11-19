@@ -49,39 +49,39 @@ const CONFIG = {
 const MARKER_TYPES = {
     default: { name: 'Обычный маркер', color: '#3498db', symbol: '' },
     cross: { name: 'X', color: '#3498db', symbol: 'X' },
-    home: { name: 'Дом', color: '#e74c3c', symbol: 'H' },
-    camp: { name: 'Лагерь', color: '#27ae60', symbol: 'C' },
-    safezone: { name: 'Безопасная зона', color: '#2ecc71', symbol: 'S' },
-    blackmarket: { name: 'Черный рынок', color: '#34495e', symbol: 'B' },
-    hospital: { name: 'Госпиталь', color: '#e74c8c', symbol: '+' },
-    sniper: { name: 'Снайпер', color: '#c0392b', symbol: '⊙' },
-    player: { name: 'Игрок', color: '#9b59b6', symbol: 'P' },
-    flag: { name: 'Флаг', color: '#d35400', symbol: '⚑' },
-    star: { name: 'Звезда', color: '#f1c40f', symbol: '★' },
-    car: { name: 'Автомобиль', color: '#16a085', symbol: '🚗' },
-    parking: { name: 'Парковка', color: '#7f8c8d', symbol: 'P' },
-    heli: { name: 'Вертолет', color: '#2980b9', symbol: '🚁' },
-    rail: { name: 'Железная дорога', color: '#8e44ad', symbol: '🚆' },
-    ship: { name: 'Корабль', color: '#3498db', symbol: '⛴' },
-    scooter: { name: 'Скутер', color: '#1abc9c', symbol: '🛵' },
-    bank: { name: 'Банк', color: '#f39c12', symbol: '💳' },
-    restaurant: { name: 'Ресторан', color: '#e67e22', symbol: '🍴' },
-    post: { name: 'Почта', color: '#95a5a6', symbol: '✉' },
-    castle: { name: 'Замок', color: '#7d3c98', symbol: '🏰' },
-    'ranger-station': { name: 'Станция рейнджера', color: '#27ae60', symbol: '🌲' },
-    water: { name: 'Вода', color: '#3498db', symbol: '💧' },
-    triangle: { name: 'Треугольник', color: '#e74c3c', symbol: '▲' },
-    cow: { name: 'Корова', color: '#8b4513', symbol: '🐄' },
-    bear: { name: 'Медведь', color: '#2c3e50', symbol: '🐻' },
-    'car-repair': { name: 'Ремонт авто', color: '#d35400', symbol: '🔧' },
-    communications: { name: 'Коммуникации', color: '#9b59b6', symbol: '📡' },
-    roadblock: { name: 'Блокпост', color: '#c0392b', symbol: '🚧' },
-    stadium: { name: 'Стадион', color: '#f1c40f', symbol: '🏟' },
-    skull: { name: 'Череп', color: '#2c3e50', symbol: '💀' },
-    rocket: { name: 'Ракета', color: '#e74c3c', symbol: '🚀' },
-    bbq: { name: 'BBQ', color: '#d35400', symbol: '🍖' },
-    ping: { name: 'Пинг', color: '#2ecc71', symbol: '📍' },
-    circle: { name: 'Круг', color: '#3498db', symbol: '●' }
+    home: { name: 'Дом H', color: '#e74c3c', symbol: 'H' },
+    camp: { name: 'Лагерь C', color: '#27ae60', symbol: 'C' },
+    safezone: { name: 'Безопасная зона S', color: '#2ecc71', symbol: 'S' },
+    blackmarket: { name: 'Черный рынок B', color: '#34495e', symbol: 'B' },
+    hospital: { name: 'Госпиталь +', color: '#e74c8c', symbol: '+' },
+    sniper: { name: 'Снайпер ⊙', color: '#c0392b', symbol: '⊙' },
+    player: { name: 'Игрок P', color: '#9b59b6', symbol: 'P' },
+    flag: { name: 'Флаг ⚑', color: '#d35400', symbol: '⚑' },
+    star: { name: 'Звезда ★', color: '#f1c40f', symbol: '★' },
+    car: { name: 'Автомобиль 🚗', color: '#16a085', symbol: '🚗' },
+    parking: { name: 'Парковка P', color: '#7f8c8d', symbol: 'P' },
+    heli: { name: 'Вертолет 🚁', color: '#2980b9', symbol: '🚁' },
+    rail: { name: 'Железная дорога 🚆', color: '#8e44ad', symbol: '🚆' },
+    ship: { name: 'Корабль ⛴', color: '#3498db', symbol: '⛴' },
+    scooter: { name: 'Скутер 🛵', color: '#1abc9c', symbol: '🛵' },
+    bank: { name: 'Банк 💳', color: '#f39c12', symbol: '💳' },
+    restaurant: { name: 'Ресторан 🍴', color: '#e67e22', symbol: '🍴' },
+    post: { name: 'Почта ✉', color: '#95a5a6', symbol: '✉' },
+    castle: { name: 'Замок 🏰', color: '#7d3c98', symbol: '🏰' },
+    'ranger-station': { name: 'Станция рейнджера 🌲', color: '#27ae60', symbol: '🌲' },
+    water: { name: 'Вода 💧', color: '#3498db', symbol: '💧' },
+    triangle: { name: 'Треугольник ▲', color: '#e74c3c', symbol: '▲' },
+    cow: { name: 'Корова 🐄', color: '#8b4513', symbol: '🐄' },
+    bear: { name: 'Медведь 🐻', color: '#2c3e50', symbol: '🐻' },
+    'car-repair': { name: 'Ремонт авто 🔧', color: '#d35400', symbol: '🔧' },
+    communications: { name: 'Коммуникации 📡', color: '#9b59b6', symbol: '📡' },
+    roadblock: { name: 'Блокпост 🚧', color: '#c0392b', symbol: '🚧' },
+    stadium: { name: 'Стадион 🏟', color: '#f1c40f', symbol: '🏟' },
+    skull: { name: 'Череп 💀', color: '#2c3e50', symbol: '💀' },
+    rocket: { name: 'Ракета 🚀', color: '#e74c3c', symbol: '🚀' },
+    bbq: { name: 'BBQ 🍖', color: '#d35400', symbol: '🍖' },
+    ping: { name: 'Пинг 📍', color: '#2ecc71', symbol: '📍' },
+    circle: { name: 'Круг ●', color: '#3498db', symbol: '●' }
 };
 
 class DayZMap {
@@ -738,10 +738,12 @@ class DayZMap {
 			if (searchTypeInput) {
 				searchTypeInput.addEventListener('change', () => {
 					// Автопоиск при изменении типа
-					if (this.searchFilter || searchTypeInput.value) {
-						this.performSearch();
+					const searchInput = document.getElementById('searchMarkers');
+					const searchTerm = searchInput ? searchInput.value.trim() : '';
+					
+					// Вызываем поиск в любом случае, даже если оба поля пустые
+					this.searchMarkers(searchTerm);
 					this.updateSearchButtons();
-					}
 				});
 			}
 
@@ -2003,68 +2005,65 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
     }
 
     updateMarkersList() {
-        const container = document.getElementById('markersContainer');
-        if (!container) return;
-        
-        container.innerHTML = '';
-        
-        // Получаем метки для отображения и сортируем их
-        let markersToShow = this.searchFilter ? this.filteredMarkers : this.markers;
-        markersToShow = this.sortMarkers(markersToShow);
-        
-        if (this.searchFilter && markersToShow.length === 0) {
-            container.innerHTML = `<div class="no-results">Метки по запросу "${this.searchFilter}" не найдены</div>`;
-        } else {
-            markersToShow.forEach(markerData => {
-                const isFiltered = this.searchFilter && 
-                                markerData.text.toLowerCase().includes(this.searchFilter);
-                
-                const item = document.createElement('div');
-                item.className = `marker-item marker-${markerData.type} ${isFiltered ? 'filtered' : ''}`;
-                item.innerHTML = `
-                    <div>
-                        <strong>${markerData.text || 'Без названия'}</strong>
-                        <div class="coords">
-                            X:${markerData.gameCoords.x} Y:${markerData.gameCoords.y}
-                        </div>
-                        <div class="type">${this.getMarkerTypeName(markerData.type)}</div>
-                    </div>
-                    <button class="delete" onclick="dayzMap.removeMarker(${markerData.id})">×</button>
-                `;
-                
-                // Обработчик двойного клика для центрирования и зума
-                item.addEventListener('dblclick', (e) => {
-                    if (!e.target.classList.contains('delete')) {
-                        // Центрируем карту на метке с зумом 8
-                        this.map.setView(markerData.leafletLatLng, 8);
-                        // Открываем попап метки
-                        markerData.marker.openPopup();
-                        
-                        // Показываем анимацию или подсветку для визуальной обратной связи
-                        this.highlightMarker(markerData);
-                    }
-                });
-                
-                // Обычный клик (одинарный) - просто центрируем без зума
-                item.addEventListener('click', (e) => {
-                    if (!e.target.classList.contains('delete')) {
-                        // Просто центрируем на метке без изменения зума
-                        this.map.setView(markerData.leafletLatLng);
-                        markerData.marker.openPopup();
-                        
-                        // Показываем анимацию или подсветку для визуальной обратной связи
-                        this.highlightMarker(markerData);
-                    }
-                });
-                
-                container.appendChild(item);
-            });
-        }
+		const container = document.getElementById('markersContainer');
+		if (!container) return;
+		
+		container.innerHTML = '';
+		
+		// Получаем метки для отображения и сортируем их
+		let markersToShow = this.isFilterActive ? this.filteredMarkers : this.markers; // Ключевое изменение!
+		markersToShow = this.sortMarkers(markersToShow);
+		
+		if (this.isFilterActive && markersToShow.length === 0) { // Используем isFilterActive вместо searchFilter
+			container.innerHTML = `<div class="no-results">Метки по заданным критериям не найдены</div>`;
+		} else {
+			markersToShow.forEach(markerData => {
+				const item = document.createElement('div');
+				item.className = `marker-item marker-${markerData.type}`;
+				item.innerHTML = `
+					<div>
+						<strong>${markerData.text || 'Без названия'}</strong>
+						<div class="coords">
+							X:${markerData.gameCoords.x} Y:${markerData.gameCoords.y}
+						</div>
+						<div class="type">${this.getMarkerTypeName(markerData.type)}</div>
+					</div>
+					<button class="delete" onclick="dayzMap.removeMarker(${markerData.id})">×</button>
+				`;
+				
+				// Обработчик двойного клика для центрирования и зума
+				item.addEventListener('dblclick', (e) => {
+					if (!e.target.classList.contains('delete')) {
+						// Центрируем карту на метке с зумом 8
+						this.map.setView(markerData.leafletLatLng, 8);
+						// Открываем попап метки
+						markerData.marker.openPopup();
+						
+						// Показываем анимацию или подсветку для визуальной обратной связи
+						this.highlightMarker(markerData);
+					}
+				});
+				
+				// Обычный клик (одинарный) - просто центрируем без зума
+				item.addEventListener('click', (e) => {
+					if (!e.target.classList.contains('delete')) {
+						// Просто центрируем на метке без изменения зума
+						this.map.setView(markerData.leafletLatLng);
+						markerData.marker.openPopup();
+						
+						// Показываем анимацию или подсветку для визуальной обратной связи
+						this.highlightMarker(markerData);
+					}
+				});
+				
+				container.appendChild(item);
+			});
+		}
 
-        // Обновляем счетчик и состояние кнопок
-        this.updateMarkersCounter();
-        this.updateSearchButtons();
-    }
+		// Обновляем счетчик и состояние кнопок
+		this.updateMarkersCounter();
+		this.updateSearchButtons();
+	}
 	
 	// Добавьте метод для подсветки метки при выборе
 	highlightMarker(markerData) {
@@ -2081,7 +2080,7 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
 		// Также подсвечиваем соответствующий элемент в списке
 		const markerItems = document.querySelectorAll('.marker-item');
 		markerItems.forEach(item => {
-			item.classList.remove('selected');
+			item.classList.remove('selected'); // Убираем выделение со всех
 		});
 		
 		// Находим и подсвечиваем текущий элемент
@@ -2095,6 +2094,12 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
 			
 			// Прокручиваем список чтобы элемент был виден
 			currentItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+			
+			// Дополнительная анимация для лучшей видимости
+			currentItem.style.animation = 'none';
+			setTimeout(() => {
+				currentItem.style.animation = 'pulse-border 1s ease-in-out';
+			}, 10);
 		}
 	}
 
@@ -2108,6 +2113,9 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
 		if (!searchBtn || !showAllBtn || !hideOthersBtn || !exportFilteredBtn) return;
 
 		const searchType = document.getElementById('searchType').value;
+		const searchInput = document.getElementById('searchMarkers');
+		const searchTerm = searchInput ? searchInput.value.trim() : '';
+		
 		const hasActiveFilter = this.searchFilter || searchType;
 
 		if (hasActiveFilter) {
@@ -2564,20 +2572,28 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
     }
 
     // Метод для поиска меток
-    searchMarkers(searchTerm) {
-		this.searchFilter = searchTerm.toLowerCase().trim();
+	searchMarkers(searchTerm) {
+		this.searchFilter = searchTerm.trim();
 		const searchType = document.getElementById('searchType').value;
 		
 		this.filteredMarkers = this.markers.filter(marker => {
-			const textMatch = !this.searchFilter || marker.text.toLowerCase().includes(this.searchFilter);
+			// Проверка по типу метки
 			const typeMatch = !searchType || marker.type === searchType;
+			
+			// Если нет текстового поиска, возвращаем только по типу
+			if (!this.searchFilter) {
+				return typeMatch;
+			}
+			
+			// Улучшенный текстовый поиск с базовой логикой
+			const textMatch = this.smartTextSearch(marker.text, this.searchFilter);
+			
 			return textMatch && typeMatch;
 		});
 
-		this.isFilterActive = true;
+		this.isFilterActive = this.searchFilter || searchType;
 		this.updateMarkersList();
 		this.showSearchResults();
-		
 		this.updateSearchButtons();
 		
 		// Показываем уведомление о количестве найденных меток
@@ -2587,16 +2603,63 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
 				const typeName = this.getMarkerTypeName(searchType);
 				message += ` (тип: ${typeName})`;
 			}
+			if (this.searchFilter) {
+				message += ` по запросу: "${this.searchFilter}"`;
+			}
 			this.showSuccess(message);
 		} else {
-			this.showError('Метки не найдены');
+			let message = 'Метки не найдены';
+			if (searchType || this.searchFilter) {
+				message += ' по заданным критериям';
+			}
+			this.showError(message);
 		}
+	}
+
+	// Умный текстовый поиск с постепенным добавлением функционала
+	smartTextSearch(markerText, searchQuery) {
+		const text = markerText.toLowerCase();
+		const query = searchQuery.toLowerCase();
+		
+		// 1. Простой поиск по одному слову (уже работает)
+		if (!query.includes('|') && !query.includes('"') && query.split(' ').length === 1) {
+			return text.includes(query);
+		}
+		
+		// 2. Поиск по нескольким словам (И по умолчанию)
+		if (query.includes(' ') && !query.includes('|')) {
+			const words = query.split(' ').filter(word => word.length > 0);
+			return words.every(word => text.includes(word));
+		}
+		
+		// 3. Поиск с оператором ИЛИ (|)
+		if (query.includes('|')) {
+			const words = query.split('|').map(word => word.trim()).filter(word => word.length > 0);
+			return words.some(word => text.includes(word));
+		}
+		
+		// 4. Точная фраза в кавычках
+		if (query.startsWith('"') && query.endsWith('"')) {
+			const exactPhrase = query.slice(1, -1);
+			return text.includes(exactPhrase);
+		}
+		
+		// На всякий случай - возвращаем к простому поиску
+		return text.includes(query);
 	}
 	
 	performSearch() {
 		const searchInput = document.getElementById('searchMarkers');
 		const searchTerm = searchInput.value.trim();
-		this.searchMarkers(searchTerm);
+		const searchType = document.getElementById('searchType').value;
+		
+		// Если есть либо текст, либо тип - выполняем поиск
+		if (searchTerm || searchType) {
+			this.searchMarkers(searchTerm);
+		} else {
+			// Если оба поля пустые - очищаем фильтр
+			this.clearSearch();
+		}
 	}
 
     // Метод для показа результатов поиска
@@ -2646,7 +2709,6 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
 		});
 		
 		this.updateMarkersList();
-		// ОБНОВЛЯЕМ КНОПКИ ПОСЛЕ ОЧИСТКИ
 		this.updateSearchButtons();
 	}
 
