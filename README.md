@@ -218,8 +218,9 @@ php -S localhost:8000
         "circleLayer": 0,
         "showAllPlayerNametags": 0
       }
-  ]
-}
+    ]
+  }
+]
 ```
 Не забудьте изменить строку "param1": "ip:port" и подставить туда актуальные значения сервера
 
