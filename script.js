@@ -113,7 +113,7 @@ class DayZMap {
 		this.gridLoaded = false;
 		this.currentSort = {
             field: 'name',
-            direction: 'asc' // 'asc' или 'desc'
+            direction: 'asc'
         };
         this.sortDirection = 1;
         this.init();
@@ -694,14 +694,6 @@ class DayZMap {
                 });
             }
 
-            // Кнопка для экспорта меток
-            const exportButton = document.createElement('button');
-            exportButton.textContent = 'Экспорт меток';
-            exportButton.addEventListener('click', () => {
-                this.exportMarkers();
-            });
-            document.querySelector('.controls').appendChild(exportButton);
-
             // Поиск меток
             const searchBtn = document.getElementById('searchBtn');
             if (searchBtn) {
@@ -760,15 +752,26 @@ class DayZMap {
                     this.hideOtherMarkers();
                 });
             }
-
-            // Кнопка переключения сетки
-            const gridToggleBtn = document.createElement('button');
-            gridToggleBtn.textContent = 'Сетка: ВКЛ';
-            gridToggleBtn.addEventListener('click', () => {
-                this.toggleGrid();
-                gridToggleBtn.textContent = this.gridEnabled ? 'Сетка: ВКЛ' : 'Сетка: ВЫКЛ';
-            });
-            document.querySelector('.controls').appendChild(gridToggleBtn);
+			
+			// Кнопка для экспорта на серверы
+			const exportToServersButton = document.createElement('button');
+			exportToServersButton.textContent = 'Экспорт меток';
+			exportToServersButton.style.marginLeft = '10px';
+			exportToServersButton.addEventListener('click', () => {
+				this.exportMarkersToServers();
+			});
+			
+			const controls = document.querySelector('.controls');
+			if (controls) {
+				controls.appendChild(exportToServersButton);
+			}
+			
+            const exportFilteredToServersBtn = document.getElementById('exportFilteredToServersBtn');
+			if (exportFilteredToServersBtn) {
+				exportFilteredToServersBtn.addEventListener('click', () => {
+					this.exportFilteredMarkersToServers();
+				});
+			}
 
             // События карты
             this.map.on('click', (e) => {
@@ -878,15 +881,7 @@ class DayZMap {
                 coordXInput.addEventListener('keypress', handleEnter);
                 coordYInput.addEventListener('keypress', handleEnter);
             }
-			
-			// Обработчик для экспорта фильтрованных меток
-            const exportFilteredBtn = document.getElementById('exportFilteredBtn');
-            if (exportFilteredBtn) {
-                exportFilteredBtn.addEventListener('click', () => {
-                    this.exportFilteredMarkers();
-                });
-            }
-			
+						
 			// Обработчик движения карты с троттлингом
 			this.map.on('move', () => {
 				if (CONFIG.lazyLoading.enabled) {
@@ -2108,9 +2103,9 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
 		const searchBtn = document.getElementById('searchBtn');
 		const showAllBtn = document.getElementById('showAllBtn');
 		const hideOthersBtn = document.getElementById('hideOthersBtn');
-		const exportFilteredBtn = document.getElementById('exportFilteredBtn');
+		const exportFilteredToServersBtn = document.getElementById('exportFilteredToServersBtn'); // Новая кнопка
 
-		if (!searchBtn || !showAllBtn || !hideOthersBtn || !exportFilteredBtn) return;
+		if (!searchBtn || !showAllBtn || !hideOthersBtn || !exportFilteredToServersBtn) return;
 
 		const searchType = document.getElementById('searchType').value;
 		const searchInput = document.getElementById('searchMarkers');
@@ -2122,61 +2117,36 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
 			searchBtn.textContent = 'Отменить';
 			searchBtn.style.background = '#e74c3c';
 			showAllBtn.style.display = 'inline-block';
-			exportFilteredBtn.style.display = 'inline-block';
-			hideOthersBtn.disabled = this.filteredMarkers.length === 0;
-			exportFilteredBtn.disabled = this.filteredMarkers.length === 0;
+			exportFilteredToServersBtn.style.display = 'inline-block';
 			
-			if (this.filteredMarkers.length === 0) {
+			// Обновляем состояние кнопок
+			const hasResults = this.filteredMarkers.length > 0;
+			hideOthersBtn.disabled = !hasResults;
+			exportFilteredToServersBtn.disabled = !hasResults;
+			
+			// Обновляем подсказки
+			if (!hasResults) {
 				hideOthersBtn.title = 'Нет найденных меток для отображения';
-				exportFilteredBtn.title = 'Нет найденных меток для экспорта';
+				exportFilteredToServersBtn.title = 'Нет найденных меток для экспорта на серверы';
 			} else {
 				hideOthersBtn.title = '';
-				exportFilteredBtn.title = `Экспортировать ${this.filteredMarkers.length} найденных меток`;
+				exportFilteredToServersBtn.title = `Экспортировать ${this.filteredMarkers.length} найденных меток на серверы`;
 			}
 		} else {
 			searchBtn.textContent = 'Поиск';
 			searchBtn.style.background = '';
 			showAllBtn.style.display = 'none';
-			exportFilteredBtn.style.display = 'none';
+			exportFilteredToServersBtn.style.display = 'none'; // Скрываем новую кнопку
+			
+			// Сбрасываем состояние
 			hideOthersBtn.disabled = true;
-			exportFilteredBtn.disabled = true;
+			exportFilteredToServersBtn.disabled = true;
 			hideOthersBtn.title = 'Сначала выполните поиск';
-			exportFilteredBtn.title = 'Сначала выполните поиск';
+			exportFilteredToServersBtn.title = 'Сначала выполните поиск';
 		}
-		
-		// Обновляем состояние кнопок в зависимости от наличия результатов
-		hideOthersBtn.disabled = !hasActiveFilter || this.filteredMarkers.length === 0;
-		exportFilteredBtn.disabled = !hasActiveFilter || this.filteredMarkers.length === 0;
 	}
 	
-	// Метод для экспорта фильтрованных меток
-    exportFilteredMarkers() {
-        if (!this.isFilterActive || this.filteredMarkers.length === 0) {
-            this.showError('Нет найденных меток для экспорта');
-            return;
-        }
-
-        const exportData = this.prepareExportData(this.filteredMarkers);
-        const searchTerm = this.searchFilter || 'filtered';
-        const searchType = document.getElementById('searchType').value;
-        
-        // Формируем имя файла на основе параметров поиска
-        let filename = 'FilteredMarkers';
-        if (searchTerm && searchTerm !== 'filtered') {
-            filename += `_${searchTerm}`;
-        }
-        if (searchType) {
-            const typeName = this.getMarkerTypeName(searchType).replace(/\s+/g, '');
-            filename += `_${typeName}`;
-        }
-        filename += '.json';
-        
-        this.downloadJSON(exportData, filename);
-        
-        this.showSuccess(`Экспортировано ${this.filteredMarkers.length} найденных меток`);
-    }
-
-    saveMarkers() {
+	saveMarkers() {
         const data = {
             markers: this.markers.map(m => ({
                 id: m.id,
@@ -2576,6 +2546,11 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
 		this.searchFilter = searchTerm.trim();
 		const searchType = document.getElementById('searchType').value;
 		
+		console.log('=== НАЧАЛО ПОИСКА ===');
+		console.log('Поисковый запрос:', this.searchFilter);
+		console.log('Тип поиска:', searchType);
+		console.log('Всего меток:', this.markers.length);
+		
 		this.filteredMarkers = this.markers.filter(marker => {
 			// Проверка по типу метки
 			const typeMatch = !searchType || marker.type === searchType;
@@ -2585,11 +2560,23 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
 				return typeMatch;
 			}
 			
-			// Улучшенный текстовый поиск с базовой логикой
-			const textMatch = this.smartTextSearch(marker.text, this.searchFilter);
+			// Улучшенный текстовый поиск
+			const textMatch = this.smartTextSearch(marker.text || '', this.searchFilter);
+			
+			console.log('Проверка метки:', {
+				name: marker.text,
+				type: marker.type,
+				typeMatch: typeMatch,
+				textMatch: textMatch,
+				результат: typeMatch && textMatch
+			});
 			
 			return textMatch && typeMatch;
 		});
+
+		console.log('=== РЕЗУЛЬТАТЫ ПОИСКА ===');
+		console.log('Найдено меток:', this.filteredMarkers.length);
+		console.log('Фильтрованные метки:', this.filteredMarkers.map(m => m.text));
 
 		this.isFilterActive = this.searchFilter || searchType;
 		this.updateMarkersList();
@@ -2616,36 +2603,70 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
 		}
 	}
 
-	// Умный текстовый поиск с постепенным добавлением функционала
+	// Умный текстовый поиск с поддержкой комбинированных операторов
 	smartTextSearch(markerText, searchQuery) {
 		const text = markerText.toLowerCase();
 		const query = searchQuery.toLowerCase();
 		
-		// 1. Простой поиск по одному слову (уже работает)
-		if (!query.includes('|') && !query.includes('"') && query.split(' ').length === 1) {
-			return text.includes(query);
+		// Если запрос пустой, возвращаем true
+		if (!query) return true;
+		
+		console.log('Поиск:', { markerText, searchQuery, text, query }); // Отладка
+		
+		// 1. Если есть оператор ИЛИ (|) - обрабатываем его в первую очередь
+		if (query.includes('|')) {
+			const parts = query.split('|').map(part => part.trim()).filter(part => part.length > 0);
+			console.log('Разделение по ИЛИ:', parts); // Отладка
+			
+			// Проверяем каждую часть на соответствие
+			for (let part of parts) {
+				let partMatch = false;
+				
+				// Если часть в кавычках - обрабатываем как точную фразу
+				if (part.startsWith('"') && part.endsWith('"')) {
+					const exactPhrase = part.slice(1, -1).trim();
+					if (exactPhrase) {
+						// ТОЧНОЕ совпадение с целым текстом метки
+						partMatch = text === exactPhrase;
+						console.log('Точный поиск:', { exactPhrase, markerText, match: partMatch });
+					}
+				} 
+				// Иначе ищем как обычное слово (частичное совпадение)
+				else if (part) {
+					partMatch = text.includes(part);
+					console.log('Частичный поиск:', { part, markerText, match: partMatch });
+				}
+				
+				if (partMatch) {
+					console.log('Найдено совпадение для части:', part);
+					return true;
+				}
+			}
+			return false;
 		}
 		
-		// 2. Поиск по нескольким словам (И по умолчанию)
-		if (query.includes(' ') && !query.includes('|')) {
+		// 2. Если запрос в кавычках - точное совпадение с целым текстом
+		if (query.startsWith('"') && query.endsWith('"')) {
+			const exactPhrase = query.slice(1, -1).trim();
+			console.log('Поиск точной фразы:', exactPhrase);
+			return exactPhrase && text === exactPhrase;
+		}
+		
+		// 3. Поиск по нескольким словам (И по умолчанию)
+		if (query.includes(' ')) {
 			const words = query.split(' ').filter(word => word.length > 0);
+			console.log('Поиск по словам И:', words);
 			return words.every(word => text.includes(word));
 		}
 		
-		// 3. Поиск с оператором ИЛИ (|)
-		if (query.includes('|')) {
-			const words = query.split('|').map(word => word.trim()).filter(word => word.length > 0);
-			return words.some(word => text.includes(word));
-		}
-		
-		// 4. Точная фраза в кавычках
-		if (query.startsWith('"') && query.endsWith('"')) {
-			const exactPhrase = query.slice(1, -1);
-			return text.includes(exactPhrase);
-		}
-		
-		// На всякий случай - возвращаем к простому поиску
+		// 4. Простой поиск по одному слову (частичное совпадение)
+		console.log('Простой поиск:', query);
 		return text.includes(query);
+	}
+
+	// Добавьте вспомогательный метод для экранирования спецсимволов в регулярных выражениях
+	escapeRegExp(string) {
+		return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 	}
 	
 	performSearch() {
@@ -2750,6 +2771,47 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
         
         this.showSuccess(`Экспортировано ${this.markers.length} меток`);
     }
+	
+	// Метод для экспорта меток с выбором серверов
+	exportMarkersToServers() {
+		if (this.markers.length === 0) {
+			this.showError('Нет меток для экспорта');
+			return;
+		}
+
+		this.showServerExportModal(this.markers, false);
+	}
+
+	// Метод для выполнения экспорта на выбранные серверы
+	performServerExport(selectedServers) {
+		// Получаем данные для экспорта (используем существующий метод)
+		const markersData = this.prepareExportData();
+		
+		if (!markersData || !markersData[0] || !markersData[0].param2) {
+			this.showError('Ошибка подготовки данных для экспорта');
+			return;
+		}
+
+		// Создаем структуру данных для каждого выбранного сервера
+		const exportData = selectedServers.map(server => ({
+			param1: server.ip,
+			param2: markersData[0].param2 // Копируем метки для каждого сервера
+		}));
+
+		// Формируем имя файла
+		const filename = `Markers_${selectedServers.length}_servers_${this.formatDate()}.json`;
+		
+		// Скачиваем файл
+		this.downloadJSON(exportData, filename);
+		
+		this.showSuccess(`Экспортировано ${this.markers.length} меток на ${selectedServers.length} серверов`);
+	}
+
+	// Вспомогательный метод для форматирования даты
+	formatDate() {
+		const now = new Date();
+		return now.toISOString().slice(0, 10).replace(/-/g, '');
+	}
 
     // Подготовка данных для экспорта в совместимом формате
     prepareExportData(markersToExport = null) {
@@ -3378,6 +3440,215 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
 
 		// Сохраняем ID таймера для очистки при ручном закрытии
 		tooltip.autoCloseId = autoClose;
+	}
+	
+	// Метод для экспорта найденных меток на серверы
+	exportFilteredMarkersToServers() {
+		if (!this.isFilterActive || this.filteredMarkers.length === 0) {
+			this.showError('Нет найденных меток для экспорта');
+			return;
+		}
+
+		this.showServerExportModal(this.filteredMarkers, true);
+	}
+	
+	// Универсальный метод для показа модального окна экспорта на серверы
+	showServerExportModal(markersToExport, isFiltered = false) {
+		const markerCount = markersToExport.length;
+		const title = isFiltered ? 
+			`Экспорт найденных меток на серверы (${markerCount} меток)` : 
+			`Экспорт всех меток на серверы (${markerCount} меток)`;
+
+		// Создаем форму для ввода серверов
+		const content = `
+			<div class="modal-field">
+				<label>Настройки серверов для экспорта:</label>
+				<div class="servers-config">
+					<div class="server-presets">
+						<details>
+							<summary><strong>Предустановленные серверы YW</strong></summary>
+							<div class="preset-servers" style="margin-top: 10px;">
+								<div class="preset-server" data-ip="109.248.4.32" data-port="2200">chernarus1 - 109.248.4.32:2200</div>
+								<div class="preset-server" data-ip="109.248.4.32" data-port="2206">chernarus2 - 109.248.4.32:2206</div>
+								<div class="preset-server" data-ip="109.248.4.32" data-port="2212">chernarus3 - 109.248.4.32:2212</div>
+								<div class="preset-server" data-ip="109.248.4.106" data-port="2200">chernarus4 - 109.248.4.106:2200</div>
+								<div class="preset-server" data-ip="109.248.4.106" data-port="2206">chernarus5 - 109.248.4.106:2206</div>
+								<div class="preset-server" data-ip="109.248.4.106" data-port="2212">chernarus6 - 109.248.4.106:2212</div>
+								<div class="preset-server" data-ip="109.248.4.32" data-port="2218">dungeon-1 - 109.248.4.32:2218</div>
+								<div class="preset-server" data-ip="109.248.4.106" data-port="2218">dungeon-2 - 109.248.4.106:2218</div>
+							</div>
+						</details>
+					</div>
+					
+					<div class="custom-servers">
+						<div class="servers-header">
+							<strong>Пользовательские серверы:</strong>
+							<button type="button" id="addServerBtn" class="small-btn">+ Добавить сервер</button>
+						</div>
+						<div id="customServersList" class="servers-list">
+							<div class="server-input-row">
+								<input type="text" class="server-ip" placeholder="IP адрес" value="109.248.4.32">
+								<input type="text" class="server-port" placeholder="Порт" value="2200">
+								<button type="button" class="remove-server-btn small-btn">×</button>
+							</div>
+						</div>
+						<div class="servers-count">Добавлено серверов: <span id="serversCount">1</span>/20</div>
+					</div>
+				</div>
+			</div>
+			
+			<div class="modal-field">
+				<label>
+					<input type="checkbox" id="includeServerName" checked>
+					Включить название сервера в файл
+				</label>
+			</div>
+			
+			<div class="modal-buttons">
+				<button id="performServerExport" style="background: #27ae60; color: white;">Экспортировать</button>
+				<button id="cancelServerExport" style="background: #7f8c8d; color: white;">Отмена</button>
+			</div>
+		`;
+
+		const modal = this.createDraggableModal(title, content);
+
+		// Инициализация функционала серверов
+		this.initServerExportForm(modal, markersToExport);
+
+		return modal;
+	}
+	
+	// Инициализация формы экспорта на серверы
+	initServerExportForm(modal, markersToExport) {
+		const serversList = modal.querySelector('#customServersList');
+		const addServerBtn = modal.querySelector('#addServerBtn');
+		const serversCount = modal.querySelector('#serversCount');
+		const presetServers = modal.querySelectorAll('.preset-server');
+
+		// Функция для обновления счетчика серверов
+		const updateServersCount = () => {
+			const count = serversList.querySelectorAll('.server-input-row').length;
+			serversCount.textContent = count;
+			addServerBtn.disabled = count >= 20;
+		};
+
+		// Функция для добавления строки сервера
+		const addServerRow = (ip = '', port = '') => {
+			if (serversList.querySelectorAll('.server-input-row').length >= 20) return;
+
+			const row = document.createElement('div');
+			row.className = 'server-input-row';
+			row.innerHTML = `
+				<input type="text" class="server-ip" placeholder="IP адрес" value="${ip}">
+				<input type="text" class="server-port" placeholder="Порт" value="${port}">
+				<button type="button" class="remove-server-btn small-btn">×</button>
+			`;
+			
+			serversList.appendChild(row);
+
+			// Обработчик удаления
+			row.querySelector('.remove-server-btn').addEventListener('click', () => {
+				row.remove();
+				updateServersCount();
+			});
+
+			updateServersCount();
+		};
+
+		// Обработчик добавления сервера
+		addServerBtn.addEventListener('click', () => {
+			addServerRow();
+		});
+
+		// Обработчики для предустановленных серверов
+		presetServers.forEach(preset => {
+			preset.addEventListener('click', () => {
+				const ip = preset.dataset.ip;
+				const port = preset.dataset.port;
+				addServerRow(ip, port);
+				
+				// Подсветка добавленного сервера
+				preset.style.background = '#27ae60';
+				setTimeout(() => {
+					preset.style.background = '';
+				}, 1000);
+			});
+		});
+
+		// Обработчик экспорта
+		modal.querySelector('#performServerExport').addEventListener('click', () => {
+			const servers = this.getServersFromForm(modal);
+			
+			if (servers.length === 0) {
+				this.showError('Добавьте хотя бы один сервер');
+				return;
+			}
+
+			const includeServerName = modal.querySelector('#includeServerName').checked;
+			this.performAdvancedServerExport(markersToExport, servers, includeServerName);
+			this.closeModal(modal);
+		});
+
+		// Обработчик отмены
+		modal.querySelector('#cancelServerExport').addEventListener('click', () => {
+			this.closeModal(modal);
+		});
+
+		updateServersCount();
+	}
+	
+	// Получение списка серверов из формы
+	getServersFromForm(modal) {
+		const servers = [];
+		const rows = modal.querySelectorAll('.server-input-row');
+		
+		rows.forEach(row => {
+			const ip = row.querySelector('.server-ip').value.trim();
+			const port = row.querySelector('.server-port').value.trim();
+			
+			if (ip && port) {
+				servers.push({
+					ip: ip,
+					port: port,
+					address: `${ip}:${port}`
+				});
+			}
+		});
+		
+		return servers;
+	}
+	
+	// Улучшенный метод экспорта на серверы
+	performAdvancedServerExport(markersToExport, servers, includeServerName = true) {
+		// Получаем данные для экспорта
+		const markersData = this.prepareExportData(markersToExport);
+		
+		if (!markersData || !markersData[0] || !markersData[0].param2) {
+			this.showError('Ошибка подготовки данных для экспорта');
+			return;
+		}
+
+		// Создаем структуру данных для каждого сервера
+		const exportData = servers.map(server => ({
+			param1: server.address,
+			param2: markersData[0].param2
+		}));
+
+		// Формируем имя файла
+		let filename = '';
+		if (this.isFilterActive && this.searchFilter) {
+			// Для фильтрованных меток добавляем параметр поиска
+			const searchTerm = this.searchFilter.replace(/[^a-zA-Z0-9а-яА-Я]/g, '_').substring(0, 20);
+			filename = `FilteredMarkers_${searchTerm}_${this.formatDate()}.json`;
+		} else {
+			// Для общего экспорта используем стандартное имя
+			filename = 'PrivateMarkers.json';
+		}
+		
+		// Скачиваем файл
+		this.downloadJSON(exportData, filename);
+		
+		this.showSuccess(`Экспортировано ${markersToExport.length} меток на ${servers.length} серверов`);
 	}
 	
 }
