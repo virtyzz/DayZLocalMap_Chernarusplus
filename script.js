@@ -116,6 +116,15 @@ class DayZMap {
             direction: 'asc'
         };
         this.sortDirection = 1;
+		this.temporaryMarker = null;
+		this.temporaryMarkerTimeout = null;
+		this.nearbySearchEnabled = false;
+        this.nearbySearchRadius = 500; // радиус по умолчанию в метрах игровых координат
+        this.nearbyMarkers = [];
+        this.nearbyCircle = null;
+        this.originalMarkerParams = null; // для сохранения параметров формы
+        this.currentMarkerPosition = null; // для сохранения позиции новой метки
+		this.temporaryAddMarker = null; // Временный маркер при добавлении
         this.init();
     }
 
@@ -1023,42 +1032,45 @@ class DayZMap {
 	
 	// Метод для добавления метки по координатам
     addMarkerByCoordinates() {
-        const coordXInput = document.getElementById('coordX');
-        const coordYInput = document.getElementById('coordY');
-        
-        if (!coordXInput || !coordYInput) {
-            this.showError('Поля для ввода координат не найдены');
-            return;
-        }
+		const coordXInput = document.getElementById('coordX');
+		const coordYInput = document.getElementById('coordY');
+		
+		if (!coordXInput || !coordYInput) {
+			this.showError('Поля для ввода координат не найдены');
+			return;
+		}
 
-        const x = parseInt(coordXInput.value);
-        const y = parseInt(coordYInput.value);
+		const x = parseInt(coordXInput.value);
+		const y = parseInt(coordYInput.value);
 
-        // Валидация координат
-        if (isNaN(x) || isNaN(y)) {
-            this.showError('Введите корректные числовые значения для координат');
-            return;
-        }
+		// Валидация координат
+		if (isNaN(x) || isNaN(y)) {
+			this.showError('Введите корректные числовые значения для координат');
+			return;
+		}
 
-        if (x < 0 || x > CONFIG.mapPixelWidth || y < 0 || y > CONFIG.mapPixelHeight) {
-            this.showError(`Координаты должны быть в пределах: X: 0-${CONFIG.mapPixelWidth}, Y: 0-${CONFIG.mapPixelHeight}`);
-            return;
-        }
+		if (x < 0 || x > CONFIG.mapPixelWidth || y < 0 || y > CONFIG.mapPixelHeight) {
+			this.showError(`Координаты должны быть в пределах: X: 0-${CONFIG.mapPixelWidth}, Y: 0-${CONFIG.mapPixelHeight}`);
+			return;
+		}
 
-        // Преобразуем игровые координаты в Leaflet координаты
-        const leafletLatLng = this.gameToLeafletCoords(x, y);
-        const gameCoords = { x: x, y: y };
+		// Преобразуем игровые координаты в Leaflet координаты
+		const leafletLatLng = this.gameToLeafletCoords(x, y);
+		const gameCoords = { x: x, y: y };
 
-        // Центрируем карту на указанных координатах
-        this.map.setView(leafletLatLng, this.map.getZoom());
+		// Центрируем карту на указанных координатах
+		this.map.setView(leafletLatLng, this.map.getZoom());
 
-        // Показываем модальное окно для создания метки
-        this.showAddMarkerModal(leafletLatLng, gameCoords);
+		// Показываем временный маркер
+		this.showTemporaryAddMarker(leafletLatLng, gameCoords);
 
-        // Очищаем поля ввода после успешного добавления
-        coordXInput.value = '';
-        coordYInput.value = '';
-    }
+		// Показываем модальное окно для создания метки
+		this.showAddMarkerModal(leafletLatLng, gameCoords);
+
+		// Очищаем поля ввода после успешного добавления
+		coordXInput.value = '';
+		coordYInput.value = '';
+	}
 	
     toggleGrid() {
         this.gridEnabled = !this.gridEnabled;
@@ -1379,39 +1391,47 @@ class DayZMap {
     }
     
 	showAddMarkerModal(leafletLatLng, gameCoords) {
-        // Получаем RGB значения из последних параметров
-        let r, g, b;
-        if (this.lastMarkerParams.color.startsWith('rgb')) {
-            const rgbMatch = this.lastMarkerParams.color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-            if (rgbMatch) {
-                r = rgbMatch[1];
-                g = rgbMatch[2];
-                b = rgbMatch[3];
-            } else {
-                r = 52; g = 152; b = 219;
-            }
-        } else {
-            const rgb = this.hexToRgb(this.lastMarkerParams.color);
-            r = rgb.r;
-            g = rgb.g;
-            b = rgb.b;
-        }
+		// Закрываем все существующие модальные окна перед созданием нового
+		this.closeAllModals();
+		// Сохраняем текущие параметры формы перед любыми изменениями
+		const currentParams = { ...this.lastMarkerParams };
+		
+		// Получаем RGB значения
+		let r, g, b;
+		if (currentParams.color.startsWith('rgb')) {
+			const rgbMatch = currentParams.color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+			if (rgbMatch) {
+				r = rgbMatch[1];
+				g = rgbMatch[2];
+				b = rgbMatch[3];
+			} else {
+				r = 52; g = 152; b = 219;
+			}
+		} else {
+			const rgb = this.hexToRgb(currentParams.color);
+			r = rgb.r;
+			g = rgb.g;
+			b = rgb.b;
+		}
 
-        const content = `
+		// Создаем временный маркер-индикатор
+		this.showTemporaryAddMarker(leafletLatLng, gameCoords);
+
+		const content = `
 			<div class="modal-field">
 				<label>Текст метки:</label>
-				<input type="text" id="newMarkerText" value="${this.lastMarkerParams.text}">
+				<input type="text" id="newMarkerText" value="${currentParams.text}">
 			</div>
 			
 			<div class="modal-field">
 				<label>Тип метки:</label>
 				<select id="newMarkerType">
-					${this.getMarkerTypeOptions(this.lastMarkerParams.type)}
+					${this.getMarkerTypeOptions(currentParams.type)}
 				</select>
 			</div>
 			
 			<div class="modal-field">
-				<label>Цвет метки (кликните на палитру или введите RGB):</label>
+				<label>Цвет метки:</label>
 				<div class="color-palette-container">
 					<div class="color-inputs">
 						<div class="color-palette-wrapper">
@@ -1432,7 +1452,7 @@ class DayZMap {
 									<input type="number" id="newColorB" min="0" max="255" value="${b}">
 								</div>
 							</div>
-							<div class="color-preview" id="newColorPreview" style="background: ${this.lastMarkerParams.color};"></div>
+							<div class="color-preview" id="newColorPreview" style="background: ${currentParams.color};"></div>
 						</div>
 					</div>
 				</div>
@@ -1445,16 +1465,23 @@ class DayZMap {
 			</div>
 			
 			<div class="modal-buttons">
-				<button id="saveNewMarker" style="background: #27ae60; color: white;">Добавить</button>
+				<button id="saveNewMarker" style="background: #27ae60; color: white;">Добавить метку</button>
+				<button id="checkNearbyBtn" style="background: #3498db; color: white;">Показать ближайшие метки</button>
 				<button id="cancelNewMarker" style="background: #7f8c8d; color: white;">Отмена</button>
 			</div>
 		`;
 
 		const modal = this.createDraggableModal('Добавление новой метки', content, () => {
+			// Этот колбэк вызывается только при закрытии через ESC или клик мимо окна добавления метки
+			console.log('🔴 Закрытие окна добавления метки через ESC/клик мимо');
 			this.disableMarkerMode();
+			this.removeTemporaryAddMarker(); // Удаляем маркер только при прямом закрытии окна добавления
+			this.cleanupNearbySearch();
 		});
+		
+		
 
-         // Создаем цветовую палитру
+		// Создаем цветовую палитру
 		this.createColorPalette('colorPalette', 'newColorR', 'newColorG', 'newColorB', 'newColorPreview');
 
 		const updateColorPreview = () => {
@@ -1471,50 +1498,106 @@ class DayZMap {
 
 		// Обработчики кнопок
 		document.getElementById('saveNewMarker').addEventListener('click', () => {
+			// Сохраняем метку напрямую
 			this.saveNewMarker(leafletLatLng, gameCoords);
+			this.removeTemporaryAddMarker(); // Удаляем временный маркер после сохранения
 			this.closeModal(modal);
 		});
 
+		document.getElementById('checkNearbyBtn').addEventListener('click', () => {
+			// Сохраняем текущие параметры формы
+			const currentFormParams = this.getCurrentFormParams();
+			this.originalMarkerParams = currentFormParams;
+			this.currentMarkerPosition = { x: gameCoords.x, y: gameCoords.y };
+			
+			// Рисуем круг и показываем ближайшие метки
+			this.drawSearchCircle(gameCoords.x, gameCoords.y, this.nearbySearchRadius);
+			// НЕ удаляем временный маркер - он должен оставаться
+			this.showNearbyMarkersModal(gameCoords.x, gameCoords.y, this.nearbySearchRadius, currentFormParams);
+			this.closeModal(modal);
+			// НЕ вызываем this.removeTemporaryAddMarker() здесь
+		});
+		
 		document.getElementById('cancelNewMarker').addEventListener('click', () => {
+			console.log('🔴 Явная отмена добавления метки');
+			this.removeTemporaryAddMarker(); // Удаляем маркер при явной отмене
 			this.closeModal(modal);
 			this.disableMarkerMode();
+			this.cleanupNearbySearch(); // Полная очистка
 		});
 
 		return modal;
 	}
+	
+	// Вспомогательный метод для получения текущих параметров формы
+	getCurrentFormParams() {
+		return {
+			text: document.getElementById('newMarkerText').value || 'Метка',
+			type: document.getElementById('newMarkerType').value,
+			color: document.getElementById('newColorPreview').style.backgroundColor
+		};
+	}
 
 
-    closeModal(modal) {
-        const handlers = this.modalCloseHandlers.get(modal);
-        if (handlers) {
-            if (handlers.closeHandler) {
-                handlers.closeHandler();
-            }
-            
-            // Удаляем обработчики перетаскивания
-            if (handlers.dragHandlers) {
-                document.removeEventListener('mousemove', handlers.dragHandlers.drag);
-                document.removeEventListener('mouseup', handlers.dragHandlers.dragEnd);
-            }
-            
-            this.modalCloseHandlers.delete(modal);
-        }
-        
-        if (modal.parentNode) {
-            modal.parentNode.removeChild(modal);
-        }
-        
-        // Убираем оверлей если нет других модальных окон
-        const activeModals = document.querySelectorAll('.marker-modal');
-        if (activeModals.length === 0) {
-            const overlay = document.querySelector('.modal-overlay');
-            if (overlay) {
-                overlay.classList.remove('active');
-            }
-        }
-    }
-    
+	closeModal(modal) {
+		if (!modal) return;
+		
+		// Проверяем, не переходим ли мы к другому модальному окну
+		const isTransitioningToNearby = this.currentMarkerPosition && this.originalMarkerParams;
+		
+		// Очищаем переопределенные обработчики если они есть
+		if (modal._escapeHandler) {
+			document.removeEventListener('keydown', modal._escapeHandler);
+			delete modal._escapeHandler;
+		}
+
+		if (modal._overlayHandler) {
+			const overlay = document.querySelector('.modal-overlay');
+			if (overlay) {
+				overlay.removeEventListener('click', modal._overlayHandler);
+			}
+			delete modal._overlayHandler;
+		}
+
+		// Очищаем стандартные обработчики
+		const handlers = this.modalCloseHandlers.get(modal);
+		if (handlers) {
+			if (handlers.closeHandler) {
+				handlers.closeHandler();
+			}
+			
+			// Удаляем обработчики перетаскивания
+			if (handlers.dragHandlers) {
+				document.removeEventListener('mousemove', handlers.dragHandlers.drag);
+				document.removeEventListener('mouseup', handlers.dragHandlers.dragEnd);
+			}
+			
+			this.modalCloseHandlers.delete(modal);
+		}
+		
+		if (modal.parentNode) {
+			modal.parentNode.removeChild(modal);
+		}
+		
+		// Убираем оверлей если нет других модальных окон
+		const activeModals = document.querySelectorAll('.marker-modal');
+		if (activeModals.length === 0) {
+			const overlay = document.querySelector('.modal-overlay');
+			if (overlay) {
+				overlay.classList.remove('active');
+			}
+			
+			// Если закрыто последнее модальное окно и нет активного поиска ближайших, удаляем временный маркер
+			if (!isTransitioningToNearby) {
+				this.removeTemporaryAddMarker();
+				this.disableMarkerMode();
+			}
+		}
+	}
+	
     saveNewMarker(leafletLatLng, gameCoords) {
+		console.log('💾 Сохранение новой метки');
+		this.cleanupNearbySearch();
 		const markerText = document.getElementById('newMarkerText').value || 'Метка';
 		const markerType = document.getElementById('newMarkerType').value;
 		const r = document.getElementById('newColorR').value;
@@ -1603,6 +1686,12 @@ class DayZMap {
 		this.updateMarkersList();
 		this.disableMarkerMode();
 
+		// Удаляем временный маркер только после успешного сохранения
+		this.removeTemporaryAddMarker();
+		
+		// Полная очистка
+		this.cleanupNearbySearch();
+		
 		this.showSuccess('Метка добавлена');
 	}
 
@@ -1686,25 +1775,29 @@ class DayZMap {
     }
 
     showEditModal(markerData) {
-        // Получаем RGB значения из цвета метки
-        let r, g, b;
-        if (markerData.color.startsWith('rgb')) {
-            const rgbMatch = markerData.color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
-            if (rgbMatch) {
-                r = rgbMatch[1];
-                g = rgbMatch[2];
-                b = rgbMatch[3];
-            } else {
-                r = 52; g = 152; b = 219;
-            }
-        } else {
-            const rgb = this.hexToRgb(markerData.color);
-            r = rgb.r;
-            g = rgb.g;
-            b = rgb.b;
-        }
+		// Закрываем все существующие модальные окна перед созданием нового
+		this.closeAllModals();
+		this.editingMarker = markerData;
+		
+		// Получаем RGB значения из цвета метки
+		let r, g, b;
+		if (markerData.color.startsWith('rgb')) {
+			const rgbMatch = markerData.color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+			if (rgbMatch) {
+				r = rgbMatch[1];
+				g = rgbMatch[2];
+				b = rgbMatch[3];
+			} else {
+				r = 52; g = 152; b = 219;
+			}
+		} else {
+			const rgb = this.hexToRgb(markerData.color);
+			r = rgb.r;
+			g = rgb.g;
+			b = rgb.b;
+		}
 
-        const content = `
+		const content = `
 			<div class="modal-field">
 				<label>Текст метки:</label>
 				<input type="text" id="editMarkerText" value="${markerData.text}">
@@ -1788,98 +1881,124 @@ class DayZMap {
 
 		return modal;
 	}
-	
-// Метод для создания цветовой палитры на Canvas
-createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
-    const paletteContainer = document.getElementById(containerId);
-    paletteContainer.innerHTML = '';
-    
-    // Создаем canvas элемент
-    const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 256;
-    canvas.style.cssText = `
-        width: 256px;
-        height: 256px;
-        margin-top: 8px;
-        border: 2px solid #555;
-        border-radius: 4px;
-        cursor: crosshair;
-    `;
-    
-    paletteContainer.appendChild(canvas);
-    
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    
-    // Создаем основной градиент (оттенки)
-    let gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
-    gradient.addColorStop(0, "rgb(255, 0, 0)");
-    gradient.addColorStop(0.15, "rgb(255, 0, 255)");
-    gradient.addColorStop(0.33, "rgb(0, 0, 255)");
-    gradient.addColorStop(0.49, "rgb(0, 255, 255)");
-    gradient.addColorStop(0.67, "rgb(0, 255, 0)");
-    gradient.addColorStop(0.84, "rgb(255, 255, 0)");
-    gradient.addColorStop(1, "rgb(255, 0, 0)");
 
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+	// Метод для создания цветовой палитры на Canvas
+	createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
+		const paletteContainer = document.getElementById(containerId);
+		
+		// Проверяем, что контейнер существует
+		if (!paletteContainer) {
+			console.error(`Контейнер с ID '${containerId}' не найден`);
+			return;
+		}
+		
+		paletteContainer.innerHTML = '';
+		
+		// Создаем canvas элемент
+		const canvas = document.createElement('canvas');
+		canvas.width = 256;
+		canvas.height = 256;
+		canvas.style.cssText = `
+			width: 256px;
+			height: 256px;
+			margin-top: 8px;
+			border: 2px solid #555;
+			border-radius: 4px;
+			cursor: crosshair;
+		`;
+		
+		paletteContainer.appendChild(canvas);
+		
+		const ctx = canvas.getContext('2d', { willReadFrequently: true });
+		
+		// Проверяем, что контекст получен
+		if (!ctx) {
+			console.error('Не удалось получить контекст Canvas');
+			return;
+		}
+		
+		// Создаем основной градиент (оттенки)
+		let gradient = ctx.createLinearGradient(0, 0, canvas.width, 0);
+		gradient.addColorStop(0, "rgb(255, 0, 0)");
+		gradient.addColorStop(0.15, "rgb(255, 0, 255)");
+		gradient.addColorStop(0.33, "rgb(0, 0, 255)");
+		gradient.addColorStop(0.49, "rgb(0, 255, 255)");
+		gradient.addColorStop(0.67, "rgb(0, 255, 0)");
+		gradient.addColorStop(0.84, "rgb(255, 255, 0)");
+		gradient.addColorStop(1, "rgb(255, 0, 0)");
 
-    // Создаем градиент для яркости/насыщенности
-    gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    gradient.addColorStop(0, "rgba(255, 255, 255, 1)");
-    gradient.addColorStop(0.5, "rgba(255, 255, 255, 0)");
-    gradient.addColorStop(0.5, "rgba(0, 0, 0, 0)");
-    gradient.addColorStop(1, "rgba(0, 0, 0, 1)");
+		ctx.fillStyle = gradient;
+		ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+		// Создаем градиент для яркости/насыщенности
+		gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+		gradient.addColorStop(0, "rgba(255, 255, 255, 1)");
+		gradient.addColorStop(0.5, "rgba(255, 255, 255, 0)");
+		gradient.addColorStop(0.5, "rgba(0, 0, 0, 0)");
+		gradient.addColorStop(1, "rgba(0, 0, 0, 1)");
 
-    // Функция для получения цвета из координат
-    const getColorAt = (x, y) => {
-        const imageData = ctx.getImageData(x, y, 1, 1).data;
-        return {
-            r: imageData[0],
-            g: imageData[1],
-            b: imageData[2]
-        };
-    };
+		ctx.fillStyle = gradient;
+		ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Обработчик перемещения и клика
-    const handleColorSelect = (e) => {
-        const rect = canvas.getBoundingClientRect();
-        const x = Math.max(0, Math.min(canvas.width - 1, e.clientX - rect.left));
-        const y = Math.max(0, Math.min(canvas.height - 1, e.clientY - rect.top));
-        
-        const color = getColorAt(x, y);
-        
-        document.getElementById(rInputId).value = color.r;
-        document.getElementById(gInputId).value = color.g;
-        document.getElementById(bInputId).value = color.b;
-        
-        // Триггерим событие input чтобы обновился preview
-        document.getElementById(rInputId).dispatchEvent(new Event('input'));
-    };
+		// Функция для получения цвета из координат
+		const getColorAt = (x, y) => {
+			try {
+				const imageData = ctx.getImageData(x, y, 1, 1).data;
+				return {
+					r: imageData[0],
+					g: imageData[1],
+					b: imageData[2]
+				};
+			} catch (error) {
+				console.error('Ошибка получения цвета:', error);
+				return { r: 255, g: 255, b: 255 }; // Значение по умолчанию
+			}
+		};
 
-    // Обработчики событий
-    let isMouseDown = false;
-    
-    canvas.addEventListener('mousedown', (e) => {
-        isMouseDown = true;
-        handleColorSelect(e);
-    });
+		// Обработчик перемещения и клика
+		const handleColorSelect = (e) => {
+			const rect = canvas.getBoundingClientRect();
+			const x = Math.max(0, Math.min(canvas.width - 1, e.clientX - rect.left));
+			const y = Math.max(0, Math.min(canvas.height - 1, e.clientY - rect.top));
+			
+			const color = getColorAt(x, y);
+			
+			// Обновляем поля ввода
+			const rInput = document.getElementById(rInputId);
+			const gInput = document.getElementById(gInputId);
+			const bInput = document.getElementById(bInputId);
+			const preview = document.getElementById(previewId);
+			
+			if (rInput && gInput && bInput && preview) {
+				rInput.value = color.r;
+				gInput.value = color.g;
+				bInput.value = color.b;
+				
+				// Триггерим событие input чтобы обновился preview
+				rInput.dispatchEvent(new Event('input'));
+			}
+		};
 
-    canvas.addEventListener('mousemove', (e) => {
-        if (isMouseDown) {
-            handleColorSelect(e);
-        }
-    });
+		// Обработчики событий
+		let isMouseDown = false;
+		
+		canvas.addEventListener('mousedown', (e) => {
+			isMouseDown = true;
+			handleColorSelect(e);
+		});
 
-    document.addEventListener('mouseup', () => {
-        isMouseDown = false;
-    });
+		canvas.addEventListener('mousemove', (e) => {
+			if (isMouseDown) {
+				handleColorSelect(e);
+			}
+		});
 
-    canvas.addEventListener('click', handleColorSelect);
-}
+		document.addEventListener('mouseup', () => {
+			isMouseDown = false;
+		});
+
+		canvas.addEventListener('click', handleColorSelect);
+	}
 
     saveMarkerEdit(markerData) {
 		const newText = document.getElementById('editMarkerText').value;
@@ -3200,10 +3319,58 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
 			// Центрируем карту с зумом 8
 			this.map.setView(leafletLatLng, 8);
 			
+			// Создаем временный маркер для визуальной индикации
+			this.showTemporaryMarker(leafletLatLng, x, y, z);
+			
 			this.showSuccess(`Центрировано на координатах: X:${x} Y:${y} Z:${z}`);
 			
 		} catch (error) {
 			this.showError(error.message);
+		}
+	}
+
+	// Метод для показа временного маркера-индикатора
+	showTemporaryMarker(leafletLatLng, x, y, z) {
+		// Удаляем предыдущий временный маркер если есть
+		this.removeTemporaryMarker();
+		
+		// Создаем анимированный маркер
+		const temporaryIcon = L.divIcon({
+			className: 'temporary-marker-indicator',
+			html: `
+				<div class="pulsating-circle">
+					<div class="inner-circle"></div>
+					<div class="pulse-ring"></div>
+					<div class="pulse-ring delay-1"></div>
+					<div class="pulse-ring delay-2"></div>
+				</div>
+				<div class="coordinates-label">X:${x} Y:${y}</div>
+			`,
+			iconSize: [60, 60],
+			iconAnchor: [30, 30]
+		});
+		
+		// Создаем маркер
+		this.temporaryMarker = L.marker(leafletLatLng, {
+			icon: temporaryIcon,
+			interactive: false
+		}).addTo(this.map);
+		
+		// Автоматически удаляем маркер через 5 секунд
+		this.temporaryMarkerTimeout = setTimeout(() => {
+			this.removeTemporaryMarker();
+		}, 5000);
+	}
+
+	// Метод для удаления временного маркера
+	removeTemporaryMarker() {
+		if (this.temporaryMarker) {
+			this.map.removeLayer(this.temporaryMarker);
+			this.temporaryMarker = null;
+		}
+		if (this.temporaryMarkerTimeout) {
+			clearTimeout(this.temporaryMarkerTimeout);
+			this.temporaryMarkerTimeout = null;
 		}
 	}
 
@@ -3650,6 +3817,873 @@ createColorPalette(containerId, rInputId, gInputId, bInputId, previewId) {
 		
 		this.showSuccess(`Экспортировано ${markersToExport.length} меток на ${servers.length} серверов`);
 	}
+	
+	// Метод для поиска ближайших меток
+	findNearbyMarkers(centerX, centerY, radius = this.nearbySearchRadius) {
+		console.log('=== findNearbyMarkers called ===');
+		console.log('centerX:', centerX, 'centerY:', centerY, 'radius:', radius);
+		console.log('Всего меток в this.markers:', this.markers.length);
+		
+		const nearby = this.markers.filter(marker => {
+			const dx = marker.gameCoords.x - centerX;
+			const dy = marker.gameCoords.y - centerY;
+			const distance = Math.sqrt(dx * dx + dy * dy);
+			console.log(`Метка "${marker.text}": расстояние ${distance}м`);
+			return distance <= radius && distance > 0; // исключаем саму метку (distance = 0)
+		}).sort((a, b) => {
+			const distA = Math.sqrt(
+				Math.pow(a.gameCoords.x - centerX, 2) + 
+				Math.pow(a.gameCoords.y - centerY, 2)
+			);
+			const distB = Math.sqrt(
+				Math.pow(b.gameCoords.x - centerX, 2) + 
+				Math.pow(b.gameCoords.y - centerY, 2)
+			);
+			return distA - distB;
+		});
+		
+		console.log('Найдено nearby меток:', nearby.length);
+		return nearby;
+	}
+
+	// Метод для отрисовки круга радиуса
+	drawSearchCircle(centerX, centerY, radius) {
+		// Удаляем старый круг если есть
+		if (this.nearbyCircle) {
+			this.map.removeLayer(this.nearbyCircle);
+		}
+		
+		// Преобразуем игровые координаты в Leaflet
+		const centerLatLng = this.gameToLeafletCoords(centerX, centerY);
+		
+		// Преобразуем радиус из игровых метров в Leaflet метры
+		// 1 игровой метр = (32 / 15360) Leaflet единиц
+		const radiusInLeafletUnits = radius * (32 / CONFIG.mapPixelWidth);
+		
+		// Создаем круг с правильными единицами измерения
+		this.nearbyCircle = L.circle(centerLatLng, {
+			radius: radiusInLeafletUnits,
+			color: '#3498db',
+			fillColor: '#2980b9',
+			fillOpacity: 0.1,
+			weight: 2,
+			dashArray: '10, 10', // пунктирная линия
+			className: 'search-radius-circle'
+		}).addTo(this.map);
+		
+		// Добавляем подпись с радиусом
+		if (this.nearbyCircleLabel) {
+			this.map.removeLayer(this.nearbyCircleLabel);
+		}
+		
+		this.nearbyCircleLabel = L.marker(centerLatLng, {
+			icon: L.divIcon({
+				className: 'circle-radius-label',
+				html: `<div style="
+					background: rgba(52, 152, 219, 0.9);
+					color: white;
+					padding: 4px 8px;
+					border-radius: 4px;
+					font-size: 12px;
+					font-weight: bold;
+					border: 1px solid white;
+					white-space: nowrap;
+				">Радиус: ${radius}м</div>`,
+				iconSize: [100, 20],
+				iconAnchor: [50, -30]
+			}),
+			interactive: false
+		}).addTo(this.map);
+	}
+	
+	// Метод для удаления круга поиска
+	removeSearchCircle() {
+		if (this.nearbyCircle) {
+			this.map.removeLayer(this.nearbyCircle);
+			this.nearbyCircle = null;
+		}
+		if (this.nearbyCircleLabel) {
+			this.map.removeLayer(this.nearbyCircleLabel);
+			this.nearbyCircleLabel = null;
+		}
+	}
+
+	// Метод для показа модального окна ближайших меток
+	showNearbyMarkersModal(centerX, centerY, radius, originalParams) {
+		// Закрываем все существующие модальные окна перед созданием нового
+		this.closeAllModals();
+		console.log('=== showNearbyMarkersModal called ===');
+		
+		const foundMarkers = this.findNearbyMarkers(centerX, centerY, radius);
+		
+		console.log('Найдено ближайших меток:', foundMarkers.length);
+		
+		// Гарантируем, что временный маркер отображается
+		if (!this.temporaryAddMarker) {
+			const leafletLatLng = this.gameToLeafletCoords(centerX, centerY);
+			this.showTemporaryAddMarker(leafletLatLng, { x: centerX, y: centerY });
+		}
+		
+		const content = `
+			<div class="modal-field">
+				<label>Радиус поиска: <span id="radiusValue">${radius}</span>м</label>
+				<div class="radius-control" style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
+					<input type="range" id="radiusSlider" min="50" max="2000" value="${radius}" step="50" style="flex: 1;">
+					<button id="updateRadiusBtn" class="small-btn" style="white-space: nowrap;">Применить</button>
+				</div>
+				<div style="display: flex; justify-content: space-between; font-size: 0.8em; color: #95a5a6; margin-top: 5px;">
+					<span>50м</span>
+					<span>1000м</span>
+					<span>2000м</span>
+				</div>
+			</div>
+			
+			<div class="modal-field">
+				<label>Найдено меток в радиусе: <strong id="markersCount">${foundMarkers.length}</strong></label>
+				<div id="nearbyMarkersList" style="max-height: 300px; overflow-y: auto; margin-top: 10px;">
+					${foundMarkers.map((marker, index) => {
+						const markerText = marker.text || 'Без названия';
+						const markerColor = marker.color || '#3498db';
+						const distance = Math.round(this.calculateDistance(centerX, centerY, marker.gameCoords.x, marker.gameCoords.y));
+						const coords = `X:${marker.gameCoords.x} Y:${marker.gameCoords.y}`;
+						
+						const markerId = marker.id.toString();
+						
+						return `
+							<div class="nearby-marker-item" data-index="${index}" style="
+								padding: 8px; 
+								margin: 4px 0; 
+								background: #34495e; 
+								border-radius: 4px; 
+								border-left: 4px solid ${markerColor};
+								cursor: pointer;
+								display: flex;
+								justify-content: space-between;
+								align-items: center;
+							">
+								<div style="flex: 1;">
+									<strong>${markerText}</strong>
+									<div style="font-size: 0.8em; color: #95a5a6;">
+										Расстояние: ${distance}м
+									</div>
+									<div style="font-size: 0.8em; color: #bdc3c7;">
+										Координаты: ${coords}
+									</div>
+								</div>
+								<button class="edit-nearby-btn" data-marker-id="${markerId}" style="
+									background: #f39c12; 
+									color: white; 
+									border: none; 
+									padding: 6px 12px; 
+									border-radius: 3px; 
+									cursor: pointer;
+									margin-left: 10px;
+									white-space: nowrap;
+								">Редактировать</button>
+							</div>
+						`;
+					}).join('')}
+				</div>
+			</div>
+			
+			<div class="modal-buttons">
+				<button id="continueWithNewMarker" style="background: #27ae60; color: white;">Продолжить добавление новой метки</button>
+				<button id="cancelNearbySearch" style="background: #7f8c8d; color: white;">Отмена</button>
+			</div>
+		`;
+
+		const modal = this.createDraggableModal('Ближайшие метки', content, () => {
+			// Обработчик закрытия для ESC и клика мимо окна
+			this.returnToAddMarkerModal();
+		});
+
+		// Сохраняем оригинальные параметры и позицию
+		this.originalMarkerParams = originalParams;
+		this.currentMarkerPosition = { x: centerX, y: centerY };
+
+		// Используем setTimeout чтобы дать время DOM полностью обновиться
+		setTimeout(() => {
+			try {
+				this.initializeRadiusControls(modal, centerX, centerY);
+				this.attachNearbyMarkersEventHandlers(modal);
+				this.attachNearbyModalCloseHandlers(modal);
+			} catch (error) {
+				console.error('Error initializing nearby markers modal:', error);
+				// В случае ошибки все равно показываем модальное окно
+			}
+		}, 100); // Увеличиваем задержку для гарантии
+
+		return modal;
+	}
+
+	// Метод для расчета расстояния между точками
+	calculateDistance(x1, y1, x2, y2) {
+		const dx = x2 - x1;
+		const dy = y2 - y1;
+		return Math.sqrt(dx * dx + dy * dy);
+	}
+
+	// Метод для редактирования ближайшей метки
+	editNearbyMarker(index, nearbyModal) {
+		console.log('=== editNearbyMarker called ===');
+		console.log('index:', index);
+		console.log('nearbyMarkers length:', this.nearbyMarkers ? this.nearbyMarkers.length : 'undefined');
+		console.log('nearbyMarkers content:', this.nearbyMarkers);
+		
+		// Проверяем, что nearbyMarkers существует и не пустой
+		if (!this.nearbyMarkers || this.nearbyMarkers.length === 0) {
+			console.error('nearbyMarkers пустой или не определен');
+			return;
+		}
+		
+		// Проверяем, что индекс корректен и метка существует
+		if (index < 0 || index >= this.nearbyMarkers.length) {
+			console.error('Неверный индекс метки:', index, 'при длине массива:', this.nearbyMarkers.length);
+			return;
+		}
+		
+		const markerData = this.nearbyMarkers[index];
+		
+		// Проверяем, что markerData корректен
+		if (!markerData || !markerData.id) {
+			console.error('Некорректные данные метки:', markerData);
+			return;
+		}
+		
+		console.log('Редактирование метки:', markerData);
+		
+		// Сохраняем ссылку на текущее окно ближайших меток
+		const currentNearbyModal = nearbyModal;
+		
+		// Функция колбэка для возврата
+		const returnCallback = () => {
+			this.returnToNearbySearch();
+		};
+		
+		// Закрываем модальное окно ближайших меток
+		if (currentNearbyModal) {
+			this.closeModal(currentNearbyModal);
+		}
+		
+		// Небольшая задержка перед открытием окна редактирования
+		setTimeout(() => {
+			// Показываем стандартное окно редактирования с колбэком для возврата
+			this.showEditModalWithCallback(markerData, returnCallback);
+		}, 100);
+	}
+	
+	// Возврат к поиску ближайших меток
+	returnToNearbySearch() {
+		console.log('=== returnToNearbySearch called ===');
+		
+		// Очищаем переопределенные обработчики если они есть
+		const editModal = document.querySelector('.marker-modal');
+		if (editModal && editModal._overriddenHandlers) {
+			document.removeEventListener('keydown', editModal._overriddenHandlers.keyHandler);
+			delete editModal._overriddenHandlers;
+		}
+
+		if (this.originalMarkerParams && this.currentMarkerPosition) {
+			// Обновляем список меток (на случай изменений)
+			this.nearbyMarkers = this.findNearbyMarkers(
+				this.currentMarkerPosition.x, 
+				this.currentMarkerPosition.y, 
+				this.nearbySearchRadius
+			);
+			
+			// Временный маркер НЕ удаляем - он должен оставаться видимым
+			
+			try {
+				// Показываем окно ближайших меток с сохраненными параметрами
+				this.showNearbyMarkersModal(
+					this.currentMarkerPosition.x,
+					this.currentMarkerPosition.y,
+					this.nearbySearchRadius,
+					this.originalMarkerParams
+				);
+			} catch (error) {
+				console.error('Error returning to nearby search:', error);
+				// В случае ошибки возвращаемся к добавлению метки
+				this.returnToAddMarkerModal();
+			}
+		} else {
+			console.warn('No original params or position for return to nearby search');
+			this.returnToAddMarkerModal();
+		}
+	}
+
+	// Возврат к окну добавления новой метки
+	returnToAddMarkerModal() {
+		console.log('🔄 Полный возврат к добавлению новой метки (с очисткой)');
+		
+		if (this.originalMarkerParams && this.currentMarkerPosition) {
+			const leafletLatLng = this.gameToLeafletCoords(
+				this.currentMarkerPosition.x, 
+				this.currentMarkerPosition.y
+			);
+			
+			const gameCoords = { 
+				x: this.currentMarkerPosition.x, 
+				y: this.currentMarkerPosition.y 
+			};
+			
+			// Восстанавливаем оригинальные параметры формы
+			this.lastMarkerParams = { ...this.originalMarkerParams };
+			
+			// Гарантируем, что временный маркер отображается
+			if (!this.temporaryAddMarker) {
+				this.showTemporaryAddMarker(leafletLatLng, gameCoords);
+			}
+			
+			// Показываем окно добавления метки
+			this.showAddMarkerModal(leafletLatLng, gameCoords);
+			
+			// Полная очистка (используется только при явной отмене)
+			this.cleanupNearbySearch();
+		} else {
+			// Если данных нет, просто отключаем режим метки
+			this.disableMarkerMode();
+			this.removeTemporaryAddMarker();
+		}
+	}
+
+	// Отмена поиска ближайших меток
+	cancelNearbySearch() {
+		this.cleanupNearbySearch();
+		this.disableMarkerMode();
+	}
+
+	// Очистка данных поиска ближайших меток
+	cleanupNearbySearch() {
+		console.log('🧹 Полная очистка nearby search (включая временный маркер)');
+		this.removeSearchCircle();
+		this.removeTemporaryAddMarker(); // Удаляем временный маркер только при полной отмене
+		this.originalMarkerParams = null;
+		this.currentMarkerPosition = null;
+		this.nearbyMarkers = [];
+	}
+	
+	// Метод для обновления списка ближайших меток в реальном времени
+	updateNearbyMarkersList(markers, centerX, centerY) {
+		const markersList = document.getElementById('nearbyMarkersList');
+		const markersCount = document.getElementById('markersCount');
+		
+		if (!markersList || !markersCount) return;
+		
+		markersList.innerHTML = markers.map((marker, index) => {
+			// Проверяем, что marker и его свойства существуют
+			const markerText = marker.text || 'Без названия';
+			const markerColor = marker.color || '#3498db';
+			const distance = Math.round(this.calculateDistance(centerX, centerY, marker.gameCoords.x, marker.gameCoords.y));
+			const coords = `X:${marker.gameCoords.x} Y:${marker.gameCoords.y}`;
+			
+			// Сохраняем точный ID как строку чтобы избежать потери точности
+			const markerId = marker.id.toString();
+			
+			return `
+				<div class="nearby-marker-item" data-index="${index}" style="
+					padding: 8px; 
+					margin: 4px 0; 
+					background: #34495e; 
+					border-radius: 4px; 
+					border-left: 4px solid ${markerColor};
+					cursor: pointer;
+					display: flex;
+					justify-content: space-between;
+					align-items: center;
+				">
+					<div style="flex: 1;">
+						<strong>${markerText}</strong>
+						<div style="font-size: 0.8em; color: #95a5a6;">
+							Расстояние: ${distance}м
+						</div>
+						<div style="font-size: 0.8em; color: #bdc3c7;">
+							Координаты: ${coords}
+						</div>
+					</div>
+					<button class="edit-nearby-btn" data-marker-id="${markerId}" style="
+						background: #f39c12; 
+						color: white; 
+						border: none; 
+						padding: 6px 12px; 
+						border-radius: 3px; 
+						cursor: pointer;
+						margin-left: 10px;
+						white-space: nowrap;
+					">Редактировать</button>
+				</div>
+			`;
+		}).join('');
+		
+		// Обновляем счетчик найденных меток
+		markersCount.textContent = markers.length;
+	}
+
+
+	// Метод для прикрепления обработчиков событий к элементам списка
+	attachNearbyMarkersEventHandlers(modal = null) {
+		console.log('=== attachNearbyMarkersEventHandlers called ===');
+		
+		// Используем делегирование событий для динамических элементов
+		const markersList = document.getElementById('nearbyMarkersList');
+		if (!markersList) {
+			console.error('markersList not found');
+			return;
+		}
+
+		// Обработчик для кликов по списку (делегирование событий)
+		markersList.addEventListener('click', (e) => {
+			console.log('Click event on markersList:', e.target);
+			
+			const editBtn = e.target.closest('.edit-nearby-btn');
+			const markerItem = e.target.closest('.nearby-marker-item');
+			
+			if (editBtn) {
+				// Получаем ID как строку чтобы сохранить точность
+				const markerId = editBtn.dataset.markerId;
+				console.log('Edit button clicked, markerId:', markerId);
+				e.stopPropagation();
+				this.editNearbyMarkerById(markerId, modal);
+			} else if (markerItem && !e.target.closest('button')) {
+				const editBtn = markerItem.querySelector('.edit-nearby-btn');
+				if (editBtn) {
+					const markerId = editBtn.dataset.markerId;
+					console.log('Marker item clicked, markerId:', markerId);
+					this.editNearbyMarkerById(markerId, modal);
+				}
+			}
+		});
+	}
+	
+	// Метод для инициализации элементов управления радиусом
+	initializeRadiusControls(modal, centerX, centerY) {
+		const radiusSlider = document.getElementById('radiusSlider');
+		const radiusValue = document.getElementById('radiusValue');
+		const updateRadiusBtn = document.getElementById('updateRadiusBtn');
+		
+		if (!radiusSlider || !radiusValue || !updateRadiusBtn) {
+			console.error('Radius controls not found');
+			return;
+		}
+
+		// Сохраняем исходные найденные метки
+		const originalNearbyMarkers = [...this.nearbyMarkers];
+		
+		// Обновление значения радиуса в реальном времени
+		radiusSlider.addEventListener('input', () => {
+			const newRadius = parseInt(radiusSlider.value);
+			radiusValue.textContent = newRadius;
+			
+			// Автоматически обновляем поиск при изменении ползунка
+			this.nearbySearchRadius = newRadius;
+			this.drawSearchCircle(centerX, centerY, newRadius);
+			
+			// Обновляем список меток в реальном времени
+			const updatedMarkers = this.findNearbyMarkers(centerX, centerY, newRadius);
+			this.updateNearbyMarkersList(updatedMarkers, centerX, centerY);
+		});
+		
+		// Обработчик кнопки применения
+		updateRadiusBtn.addEventListener('click', () => {
+			const newRadius = parseInt(radiusSlider.value);
+			if (newRadius && newRadius > 0) {
+				this.nearbySearchRadius = newRadius;
+				this.drawSearchCircle(centerX, centerY, newRadius);
+				
+				// Обновляем список меток, но сохраняем исходные данные для редактирования
+				const updatedMarkers = this.findNearbyMarkers(centerX, centerY, newRadius);
+				this.updateNearbyMarkersList(updatedMarkers, centerX, centerY);
+			}
+		});
+
+		// Обработчики основных кнопок с проверками
+		const continueBtn = document.getElementById('continueWithNewMarker');
+		const cancelBtn = document.getElementById('cancelNearbySearch');
+		
+		if (continueBtn) {
+			continueBtn.addEventListener('click', () => {
+				this.closeModal(modal);
+				this.returnToAddMarkerModalFromNearby(); // Используем новый метод
+			});
+		}
+
+		if (cancelBtn) {
+			cancelBtn.addEventListener('click', () => {
+				this.closeModal(modal);
+				this.returnToAddMarkerModalFromNearby(); // Используем новый метод
+			});
+		}
+	}
+	
+	// Метод для показа модального окна редактирования с колбэком при закрытии
+	showEditModalWithCallback(markerData, onCloseCallback) {
+		// Закрываем все существующие модальные окна перед созданием нового
+		this.closeAllModals();
+		// Проверяем, что markerData корректен
+		if (!markerData) {
+			console.error('Некорректные данные метки для редактирования');
+			if (onCloseCallback) onCloseCallback();
+			return;
+		}
+
+		// Получаем RGB значения из цвета метки
+		let r, g, b;
+		let markerColor = markerData.color || '#3498db';
+		
+		if (markerColor.startsWith('rgb')) {
+			const rgbMatch = markerColor.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+			if (rgbMatch) {
+				r = rgbMatch[1];
+				g = rgbMatch[2];
+				b = rgbMatch[3];
+			} else {
+				r = 52; g = 152; b = 219;
+			}
+		} else {
+			const rgb = this.hexToRgb(markerColor);
+			r = rgb.r;
+			g = rgb.g;
+			b = rgb.b;
+		}
+
+		const markerText = markerData.text || 'Метка';
+		const markerType = markerData.type || 'default';
+
+		const content = `
+			<div class="modal-field">
+				<label>Текст метки:</label>
+				<input type="text" id="editMarkerText" value="${markerText}">
+			</div>
+			
+			<div class="modal-field">
+				<label>Тип метки:</label>
+				<select id="editMarkerType">
+					${this.getMarkerTypeOptions(markerType)}
+				</select>
+			</div>
+			
+			<div class="modal-field">
+				<label>Цвет метки (кликните на палитру или введите RGB):</label>
+				<div class="color-palette-container">
+					<div class="color-inputs">
+						<div class="color-palette-wrapper">
+							<div id="editColorPalette"></div>
+						</div>
+						<div class="color-controls">
+							<div class="color-rgb-inputs">
+								<div class="color-rgb-row">
+									<span>R:</span>
+									<input type="number" id="editColorR" min="0" max="255" value="${r}">
+								</div>
+								<div class="color-rgb-row">
+									<span>G:</span>
+									<input type="number" id="editColorG" min="0" max="255" value="${g}">
+								</div>
+								<div class="color-rgb-row">
+									<span>B:</span>
+									<input type="number" id="editColorB" min="0" max="255" value="${b}">
+								</div>
+							</div>
+							<div class="color-preview" id="colorPreview" style="background: ${markerColor};"></div>
+						</div>
+					</div>
+				</div>
+			</div>
+			
+			<div class="modal-buttons">
+				<button id="saveEdit" style="background: #27ae60; color: white;">Сохранить</button>
+				<button id="deleteMarker" style="background: #e74c3c; color: white;">Удалить</button>
+				<button id="cancelEdit" style="background: #7f8c8d; color: white;">Отмена</button>
+			</div>
+		`;
+
+		const modal = this.createDraggableModal('Редактирование метки', content, () => {
+			// При закрытии окна редактирования (ESC, клик мимо) возвращаемся к поиску ближайших
+			if (onCloseCallback) onCloseCallback();
+		});
+
+		// Создаем цветовую палитру сразу после создания модального окна
+		this.createColorPalette('editColorPalette', 'editColorR', 'editColorG', 'editColorB', 'colorPreview');
+
+		const updateColorPreview = () => {
+			const r = document.getElementById('editColorR').value;
+			const g = document.getElementById('editColorG').value;
+			const b = document.getElementById('editColorB').value;
+			const color = `rgb(${r}, ${g}, ${b})`;
+			const preview = document.getElementById('colorPreview');
+			if (preview) {
+				preview.style.background = color;
+			}
+		};
+
+		// Добавляем обработчики событий
+		const rInput = document.getElementById('editColorR');
+		const gInput = document.getElementById('editColorG');
+		const bInput = document.getElementById('editColorB');
+		
+		if (rInput && gInput && bInput) {
+			rInput.addEventListener('input', updateColorPreview);
+			gInput.addEventListener('input', updateColorPreview);
+			bInput.addEventListener('input', updateColorPreview);
+		}
+
+		// Обработчики кнопок
+		const saveBtn = document.getElementById('saveEdit');
+		const deleteBtn = document.getElementById('deleteMarker');
+		const cancelBtn = document.getElementById('cancelEdit');
+		
+		if (saveBtn) {
+			saveBtn.addEventListener('click', () => {
+				this.saveMarkerEdit(markerData);
+				this.closeModal(modal);
+				if (onCloseCallback) onCloseCallback();
+			});
+		}
+		
+		if (deleteBtn) {
+			deleteBtn.addEventListener('click', () => {
+				if (confirm('Вы уверены, что хотите удалить эту метку?')) {
+					this.removeMarker(markerData.id);
+					this.closeModal(modal);
+					if (onCloseCallback) onCloseCallback();
+				}
+			});
+		}
+		
+		if (cancelBtn) {
+			cancelBtn.addEventListener('click', () => {
+				this.closeModal(modal);
+				if (onCloseCallback) onCloseCallback();
+			});
+		}
+
+		return modal;
+	}
+	
+	// Метод для редактирования ближайшей метки по ID
+	editNearbyMarkerById(markerId, nearbyModal) {
+		console.log('=== editNearbyMarkerById called ===');
+		
+		// Преобразуем ID в число для поиска (если это число)
+		const searchId = !isNaN(markerId) ? parseFloat(markerId) : markerId;
+		
+		// Ищем метку в основном массиве markers по ID
+		const markerData = this.markers.find(marker => {
+			if (typeof marker.id === 'number' && typeof searchId === 'number') {
+				return Math.abs(marker.id - searchId) < 0.001;
+			}
+			return marker.id.toString() === searchId.toString();
+		});
+		
+		if (!markerData) {
+			console.error('Метка не найдена по ID:', searchId);
+			return;
+		}
+		
+		console.log('Найдена метка для редактирования:', markerData);
+		
+		// Сохраняем ссылку на текущее окно ближайших меток
+		const currentNearbyModal = nearbyModal;
+		
+		// Функция колбэка для возврата
+		const returnCallback = () => {
+			this.returnToNearbySearch();
+		};
+		
+		// Закрываем модальное окно ближайших меток
+		if (currentNearbyModal) {
+			this.closeModal(currentNearbyModal);
+		}
+		
+		// Показываем стандартное окно редактирования с колбэком для возврата
+		this.showEditModalWithCallback(markerData, returnCallback);
+	}
+	
+	// Метод для прикрепления обработчиков закрытия к модальному окну ближайших меток
+	attachNearbyModalCloseHandlers(modal) {
+		if (!modal) {
+			console.error('Modal is null in attachNearbyModalCloseHandlers');
+			return;
+		}
+
+		// Получаем элементы управления закрытием с проверками
+		const closeBtn = modal.querySelector('.modal-close');
+		const cancelBtn = modal.querySelector('#cancelNearbySearch');
+		const continueBtn = modal.querySelector('#continueWithNewMarker');
+
+		// Функция для возврата к окну добавления метки БЕЗ удаления временного маркера
+		const returnToAddMarker = () => {
+			console.log('🔙 Возврат из ближайших меток');
+			this.returnToAddMarkerModalFromNearby();
+		};
+
+		// Обработчики для кнопок закрытия с проверками
+		if (closeBtn) {
+			closeBtn.addEventListener('click', returnToAddMarker);
+		}
+
+		if (cancelBtn) {
+			cancelBtn.addEventListener('click', returnToAddMarker);
+		}
+
+		if (continueBtn) {
+			continueBtn.addEventListener('click', returnToAddMarker);
+		}
+
+		// Переопределяем обработчик ESC для этого модального окна
+		const keyHandler = (e) => {
+			if (e.key === 'Escape') {
+				returnToAddMarker();
+			}
+		};
+
+		// Сохраняем ссылку на обработчик для последующей очистки
+		modal._escapeHandler = keyHandler;
+		document.addEventListener('keydown', keyHandler);
+
+		// Также переопределяем обработчик клика на оверлей
+		const overlay = document.querySelector('.modal-overlay');
+		if (overlay) {
+			const overlayHandler = (e) => {
+				if (e.target === overlay) {
+					returnToAddMarker();
+				}
+			};
+			modal._overlayHandler = overlayHandler;
+			overlay.addEventListener('click', overlayHandler);
+		}
+	}
+
+	
+	// Метод для показа временного маркера при добавлении
+	showTemporaryAddMarker(leafletLatLng, gameCoords) {
+		console.log('🟢 ПОКАЗЫВАЕМ временный маркер в координатах:', gameCoords);
+		
+		// Удаляем предыдущий временный маркер если есть
+		this.removeTemporaryAddMarker();
+		
+		// Создаем красный анимированный маркер
+		const temporaryIcon = L.divIcon({
+			className: 'temporary-add-marker-indicator',
+			html: `
+				<div class="pulsating-add-circle">
+					<div class="add-inner-circle"></div>
+					<div class="add-pulse-ring"></div>
+					<div class="add-pulse-ring add-delay-1"></div>
+					<div class="add-pulse-ring add-delay-2"></div>
+				</div>
+				<div class="add-coordinates-label">X:${gameCoords.x} Y:${gameCoords.y}</div>
+			`,
+			iconSize: [60, 60],
+			iconAnchor: [30, 30]
+		});
+		
+		// Создаем маркер
+		this.temporaryAddMarker = L.marker(leafletLatLng, {
+			icon: temporaryIcon,
+			interactive: false
+		}).addTo(this.map);
+		
+		console.log('🟢 Временный маркер создан:', this.temporaryAddMarker);
+	}
+
+	// Метод для удаления временного маркера при добавлении
+	removeTemporaryAddMarker() {
+		if (this.temporaryAddMarker) {
+			console.log('🔴 УДАЛЯЕМ временный маркер');
+			this.map.removeLayer(this.temporaryAddMarker);
+			this.temporaryAddMarker = null;
+		} else {
+			console.log('🔴 Временный маркер уже удален или не существует');
+		}
+	}
+	
+	// Очистка данных поиска ближайших меток без удаления временного маркера
+	cleanupNearbySearchButKeepMarker() {
+		this.removeSearchCircle();
+		// НЕ удаляем временный маркер: this.removeTemporaryAddMarker();
+		this.originalMarkerParams = null;
+		this.currentMarkerPosition = null;
+		this.nearbyMarkers = [];
+	}
+	
+	// Метод для проверки, активно ли окно ближайших меток
+	isNearbySearchActive() {
+		return !!document.querySelector('.marker-modal .modal-header h3')?.textContent?.includes('Ближайшие метки');
+	}
+	
+	// Вспомогательный метод для безопасного добавления обработчиков событий
+	safeAddEventListener(element, event, handler) {
+		if (element && typeof element.addEventListener === 'function') {
+			element.addEventListener(event, handler);
+			return true;
+		} else {
+			console.warn(`Cannot add event listener to element:`, element);
+			return false;
+		}
+	}
+	
+	// Возврат к окну добавления новой метки из окна ближайших меток (без удаления временного маркера)
+	returnToAddMarkerModalFromNearby() {
+		console.log('🔄 Возврат из ближайших меток к добавлению новой метки');
+		
+		// Закрываем ВСЕ существующие модальные окна перед созданием нового
+		this.closeAllModals();
+		
+		if (this.originalMarkerParams && this.currentMarkerPosition) {
+			const leafletLatLng = this.gameToLeafletCoords(
+				this.currentMarkerPosition.x, 
+				this.currentMarkerPosition.y
+			);
+			
+			const gameCoords = { 
+				x: this.currentMarkerPosition.x, 
+				y: this.currentMarkerPosition.y 
+			};
+			
+			// Восстанавливаем оригинальные параметры формы
+			this.lastMarkerParams = { ...this.originalMarkerParams };
+			
+			// Гарантируем, что временный маркер отображается
+			if (!this.temporaryAddMarker) {
+				console.log('🟡 Восстанавливаем временный маркер при возврате из ближайших');
+				this.showTemporaryAddMarker(leafletLatLng, gameCoords);
+			} else {
+				console.log('🟢 Временный маркер уже на месте при возврате из ближайших');
+				// Если маркер уже есть, обновляем его позицию на всякий случай
+				this.temporaryAddMarker.setLatLng(leafletLatLng);
+			}
+			
+			// Удаляем круг поиска, но НЕ временный маркер
+			this.removeSearchCircle();
+			
+			// Показываем окно добавления метки
+			this.showAddMarkerModal(leafletLatLng, gameCoords);
+			
+			console.log('✅ Возврат к добавлению метки завершен, временный маркер сохранен');
+		} else {
+			console.warn('❌ Нет данных для возврата к добавлению метки');
+			this.disableMarkerMode();
+		}
+	}
+	
+	// Метод для закрытия всех модальных окон
+	closeAllModals() {
+		console.log('🗑️ Закрываем все модальные окна');
+		
+		// Закрываем все модальные окна
+		const allModals = document.querySelectorAll('.marker-modal');
+		allModals.forEach(modal => {
+			this.closeModal(modal);
+		});
+		
+		// Убираем оверлей
+		const overlay = document.querySelector('.modal-overlay');
+		if (overlay) {
+			overlay.classList.remove('active');
+		}
+	}
+
 	
 }
 
