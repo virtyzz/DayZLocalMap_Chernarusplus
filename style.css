@@ -878,7 +878,7 @@ body {
 }
 
 /* Подсветка активных полей фильтра */
-#searchMarkers:not(:placeholder-shown),
+/*#searchMarkers:not(:placeholder-shown),*/
 #searchType:not([value=""]) {
     border-color: #3498db !important;
     background: #2c3e50 !important;
@@ -1655,3 +1655,41 @@ input[type="range"]::-moz-range-thumb {
 .temporary-add-marker-indicator {
     animation: add-fadeIn 0.3s ease-out;
 }
+
+#searchMarkers {
+    transition: all 0.3s ease;
+}
+
+#searchMarkers:focus {
+    border-color: #3498db;
+    box-shadow: 0 0 5px rgba(52, 152, 219, 0.5);
+}
+
+/* Стиль для подсказки в поиске */
+.search-hint {
+    font-size: 0.8em;
+    color: #95a5a6;
+    margin-top: 5px;
+}
+
+/* Добавим стили для подсказки префиксов */
+.search-hint strong {
+    color: #e74c3c;
+}
+
+/* Подсветка префиксов в поле поиска */
+#searchMarkers:not(:placeholder-shown) {
+    background: #2c3e50;
+}
+
+/* Специальная подсветка для поиска по типу */
+#searchMarkers[data-search-type="type"] {
+    border-color: #f39c12 !important;
+    box-shadow: 0 0 5px rgba(243, 156, 18, 0.5) !important;
+}
+
+#searchMarkers[data-search-type="exact-type"] {
+    border-color: #e74c3c !important;
+    box-shadow: 0 0 5px rgba(231, 76, 60, 0.5) !important;
+}
+

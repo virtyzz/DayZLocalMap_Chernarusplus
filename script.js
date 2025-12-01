@@ -2667,119 +2667,80 @@ class DayZMap {
 		
 		console.log('=== НАЧАЛО ПОИСКА ===');
 		console.log('Поисковый запрос:', this.searchFilter);
-		console.log('Тип поиска:', searchType);
-		console.log('Всего меток:', this.markers.length);
+		console.log('Тип поиска из селекта:', searchType);
+		
+		// Парсим сложный запрос
+		const parsedQuery = this.parseComplexSearch(this.searchFilter);
+		console.log('Распарсенный запрос:', parsedQuery);
 		
 		this.filteredMarkers = this.markers.filter(marker => {
-			// Проверка по типу метки
-			const typeMatch = !searchType || marker.type === searchType;
-			
-			// Если нет текстового поиска, возвращаем только по типу
-			if (!this.searchFilter) {
-				return typeMatch;
+			// Проверка по типу из выпадающего списка (имеет высший приоритет)
+			if (searchType) {
+				if (marker.type !== searchType) {
+					return false;
+				}
 			}
 			
-			// Улучшенный текстовый поиск
-			const textMatch = this.smartTextSearch(marker.text || '', this.searchFilter);
+			// Если нет поискового запроса, возвращаем все подходящие по типу из селекта
+			if (!this.searchFilter) {
+				return true;
+			}
 			
-			console.log('Проверка метки:', {
-				name: marker.text,
-				type: marker.type,
-				typeMatch: typeMatch,
-				textMatch: textMatch,
-				результат: typeMatch && textMatch
-			});
-			
-			return textMatch && typeMatch;
+			// Проверяем сложный запрос
+			return this.checkComplexQuery(marker, parsedQuery);
 		});
 
 		console.log('=== РЕЗУЛЬТАТЫ ПОИСКА ===');
 		console.log('Найдено меток:', this.filteredMarkers.length);
-		console.log('Фильтрованные метки:', this.filteredMarkers.map(m => m.text));
+		console.log('Фильтрованные метки:', this.filteredMarkers.map(m => ({
+			name: m.text,
+			type: m.type
+		})));
 
 		this.isFilterActive = this.searchFilter || searchType;
 		this.updateMarkersList();
 		this.showSearchResults();
 		this.updateSearchButtons();
 		
-		// Показываем уведомление о количестве найденных меток
+		// Показываем уведомление
 		if (this.filteredMarkers.length > 0) {
 			let message = `Найдено ${this.filteredMarkers.length} меток`;
+			
 			if (searchType) {
 				const typeName = this.getMarkerTypeName(searchType);
 				message += ` (тип: ${typeName})`;
 			}
+			
 			if (this.searchFilter) {
 				message += ` по запросу: "${this.searchFilter}"`;
 			}
+			
 			this.showSuccess(message);
 		} else {
 			let message = 'Метки не найдены';
+			
 			if (searchType || this.searchFilter) {
 				message += ' по заданным критериям';
 			}
+			
 			this.showError(message);
 		}
 	}
 
 	// Умный текстовый поиск с поддержкой комбинированных операторов
+	// Упростим метод smartTextSearch (он теперь не нужен для основной логики)
 	smartTextSearch(markerText, searchQuery) {
+		// Этот метод теперь используется только для простых текстовых поисков
 		const text = markerText.toLowerCase();
 		const query = searchQuery.toLowerCase();
 		
-		// Если запрос пустой, возвращаем true
 		if (!query) return true;
 		
-		console.log('Поиск:', { markerText, searchQuery, text, query }); // Отладка
-		
-		// 1. Если есть оператор ИЛИ (|) - обрабатываем его в первую очередь
-		if (query.includes('|')) {
-			const parts = query.split('|').map(part => part.trim()).filter(part => part.length > 0);
-			console.log('Разделение по ИЛИ:', parts); // Отладка
-			
-			// Проверяем каждую часть на соответствие
-			for (let part of parts) {
-				let partMatch = false;
-				
-				// Если часть в кавычках - обрабатываем как точную фразу
-				if (part.startsWith('"') && part.endsWith('"')) {
-					const exactPhrase = part.slice(1, -1).trim();
-					if (exactPhrase) {
-						// ТОЧНОЕ совпадение с целым текстом метки
-						partMatch = text === exactPhrase;
-						console.log('Точный поиск:', { exactPhrase, markerText, match: partMatch });
-					}
-				} 
-				// Иначе ищем как обычное слово (частичное совпадение)
-				else if (part) {
-					partMatch = text.includes(part);
-					console.log('Частичный поиск:', { part, markerText, match: partMatch });
-				}
-				
-				if (partMatch) {
-					console.log('Найдено совпадение для части:', part);
-					return true;
-				}
-			}
-			return false;
-		}
-		
-		// 2. Если запрос в кавычках - точное совпадение с целым текстом
 		if (query.startsWith('"') && query.endsWith('"')) {
-			const exactPhrase = query.slice(1, -1).trim();
-			console.log('Поиск точной фразы:', exactPhrase);
+			const exactPhrase = query.slice(1, -1);
 			return exactPhrase && text === exactPhrase;
 		}
 		
-		// 3. Поиск по нескольким словам (И по умолчанию)
-		if (query.includes(' ')) {
-			const words = query.split(' ').filter(word => word.length > 0);
-			console.log('Поиск по словам И:', words);
-			return words.every(word => text.includes(word));
-		}
-		
-		// 4. Простой поиск по одному слову (частичное совпадение)
-		console.log('Простой поиск:', query);
 		return text.includes(query);
 	}
 
@@ -3359,7 +3320,7 @@ class DayZMap {
 		// Автоматически удаляем маркер через 5 секунд
 		this.temporaryMarkerTimeout = setTimeout(() => {
 			this.removeTemporaryMarker();
-		}, 5000);
+		}, 10000);
 	}
 
 	// Метод для удаления временного маркера
@@ -4683,6 +4644,197 @@ class DayZMap {
 			overlay.classList.remove('active');
 		}
 	}
+	
+	getSearchPrefixes() {
+		return {
+			TYPE_PREFIX: '@',       // @дом - поиск по типу метки
+			EXACT_TYPE_PREFIX: '@@' // @@дом - точное совпадение типа
+		};
+	}
+	
+	//проверка типа метки по запросу
+	isMarkerTypeSearch(searchTerm) {
+		const { TYPE_PREFIX, EXACT_TYPE_PREFIX } = this.getSearchPrefixes();
+		const normalizedSearch = searchTerm.toLowerCase().trim();
+		
+		// Проверяем префиксы
+		const isTypeSearch = normalizedSearch.startsWith(TYPE_PREFIX);
+		const isExactTypeSearch = normalizedSearch.startsWith(EXACT_TYPE_PREFIX);
+		
+		if (!isTypeSearch && !isExactTypeSearch) {
+			return null; // Не поиск по типу
+		}
+		
+		// Убираем префикс для поиска
+		const searchWithoutPrefix = isExactTypeSearch ? 
+			normalizedSearch.slice(EXACT_TYPE_PREFIX.length) : 
+			normalizedSearch.slice(TYPE_PREFIX.length);
+		
+		if (!searchWithoutPrefix) {
+			return null; // Пустой запрос после префикса
+		}
+		
+		console.log('Поиск по типу:', { 
+			original: searchTerm, 
+			withoutPrefix: searchWithoutPrefix,
+			exact: isExactTypeSearch 
+		});
+		
+		// Ищем подходящий тип метки
+		for (const [typeKey, typeData] of Object.entries(MARKER_TYPES)) {
+			const typeName = typeData.name.toLowerCase();
+			const typeSymbol = typeData.symbol.toLowerCase();
+			const typeKeyLower = typeKey.toLowerCase();
+			
+			let match = false;
+			
+			if (isExactTypeSearch) {
+				// Точное совпадение для @@ префикса
+				match = typeName === searchWithoutPrefix || 
+					   typeSymbol === searchWithoutPrefix ||
+					   typeKeyLower === searchWithoutPrefix;
+			} else {
+				// Частичное совпадение для @ префикса
+				match = typeName.includes(searchWithoutPrefix) || 
+					   typeSymbol.includes(searchWithoutPrefix) ||
+					   typeKeyLower.includes(searchWithoutPrefix);
+			}
+			
+			if (match) {
+				console.log('Найден тип:', typeKey);
+				return typeKey;
+			}
+		}
+		
+		console.log('Тип не найден для запроса:', searchWithoutPrefix);
+		return null;
+	}
+	
+	//метод для парсинга сложных поисковых запросов
+	parseComplexSearch(query) {
+		const { TYPE_PREFIX, EXACT_TYPE_PREFIX } = this.getSearchPrefixes();
+		
+		// Если запрос содержит оператор ИЛИ, разбиваем на части
+		if (query.includes('|')) {
+			const parts = query.split('|').map(part => part.trim()).filter(part => part.length > 0);
+			const parsedParts = [];
+			
+			for (let part of parts) {
+				if (part.startsWith(EXACT_TYPE_PREFIX)) {
+					// Точный поиск по типу @@тип
+					const typeQuery = part.slice(EXACT_TYPE_PREFIX.length);
+					const detectedType = this.findExactMarkerType(typeQuery);
+					parsedParts.push({ type: 'exact-type', value: detectedType, original: part });
+				} else if (part.startsWith(TYPE_PREFIX)) {
+					// Поиск по типу @тип
+					const typeQuery = part.slice(TYPE_PREFIX.length);
+					const detectedType = this.findPartialMarkerType(typeQuery);
+					parsedParts.push({ type: 'type', value: detectedType, original: part });
+				} else if (part.startsWith('"') && part.endsWith('"')) {
+					// Точная текстовая фраза
+					const textQuery = part.slice(1, -1);
+					parsedParts.push({ type: 'exact-text', value: textQuery, original: part });
+				} else {
+					// Обычный текстовый поиск
+					parsedParts.push({ type: 'text', value: part, original: part });
+				}
+			}
+			
+			return { type: 'or', parts: parsedParts };
+		}
+		
+		// Одиночный запрос
+		if (query.startsWith(EXACT_TYPE_PREFIX)) {
+			const typeQuery = query.slice(EXACT_TYPE_PREFIX.length);
+			const detectedType = this.findExactMarkerType(typeQuery);
+			return { type: 'exact-type', value: detectedType, original: query };
+		} else if (query.startsWith(TYPE_PREFIX)) {
+			const typeQuery = query.slice(TYPE_PREFIX.length);
+			const detectedType = this.findPartialMarkerType(typeQuery);
+			return { type: 'type', value: detectedType, original: query };
+		} else if (query.startsWith('"') && query.endsWith('"')) {
+			const textQuery = query.slice(1, -1);
+			return { type: 'exact-text', value: textQuery, original: query };
+		} else {
+			return { type: 'text', value: query, original: query };
+		}
+	}
+	
+	// Вспомогательные методы для поиска типов
+	findExactMarkerType(query) {
+		const normalizedQuery = query.toLowerCase().trim();
+		
+		for (const [typeKey, typeData] of Object.entries(MARKER_TYPES)) {
+			const typeName = typeData.name.toLowerCase();
+			const typeSymbol = typeData.symbol.toLowerCase();
+			const typeKeyLower = typeKey.toLowerCase();
+			
+			if (typeName === normalizedQuery || 
+				typeSymbol === normalizedQuery ||
+				typeKeyLower === normalizedQuery) {
+				return typeKey;
+			}
+		}
+		return null;
+	}
+
+	findPartialMarkerType(query) {
+		const normalizedQuery = query.toLowerCase().trim();
+		
+		for (const [typeKey, typeData] of Object.entries(MARKER_TYPES)) {
+			const typeName = typeData.name.toLowerCase();
+			const typeSymbol = typeData.symbol.toLowerCase();
+			const typeKeyLower = typeKey.toLowerCase();
+			
+			if (typeName.includes(normalizedQuery) || 
+				typeSymbol.includes(normalizedQuery) ||
+				typeKeyLower.includes(normalizedQuery)) {
+				return typeKey;
+			}
+		}
+		return null;
+	}
+	
+	// Метод для проверки сложного запроса
+	checkComplexQuery(marker, parsedQuery) {
+		if (parsedQuery.type === 'or') {
+			// Оператор ИЛИ - достаточно одного совпадения
+			for (const part of parsedQuery.parts) {
+				if (this.checkQueryPart(marker, part)) {
+					return true;
+				}
+			}
+			return false;
+		} else {
+			// Одиночный запрос
+			return this.checkQueryPart(marker, parsedQuery);
+		}
+	}
+	
+	// Метод для проверки отдельной части запроса
+	checkQueryPart(marker, queryPart) {
+		switch (queryPart.type) {
+			case 'exact-type':
+				// Точное совпадение типа @@тип
+				return queryPart.value && marker.type === queryPart.value;
+				
+			case 'type':
+				// Частичное совпадение типа @тип
+				return queryPart.value && marker.type === queryPart.value;
+				
+			case 'exact-text':
+				// Точное совпадение текста
+				return marker.text && marker.text.toLowerCase() === queryPart.value.toLowerCase();
+				
+			case 'text':
+				// Частичное совпадение текста
+				return marker.text && marker.text.toLowerCase().includes(queryPart.value.toLowerCase());
+				
+			default:
+				return false;
+		}
+	}
+
 
 	
 }
