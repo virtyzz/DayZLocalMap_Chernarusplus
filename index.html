@@ -67,7 +67,21 @@
 						</div>
 					</details>
 				</div>
+                <div class="search-wrapper">
                 <input type="text" id="searchMarkers" placeholder="Поиск по названию или типу метки...">
+				<div class="search-history-section">
+					<details id="searchHistoryDetails" open="false">
+						<summary>
+							<strong>История поиска</strong>
+							<span id="searchHistoryCount" style="color: #888; font-size: 0.9em; margin-left: 10px;">(0)</span>
+						</summary>
+						<div style="margin-top: 10px;">
+							<div id="searchHistoryList" class="search-history-items"></div>
+							<button id="clearSearchHistory" style="padding: 5px 10px; background: #e74c3c; color: white; border: none; border-radius: 3px; cursor: pointer; margin-top: 10px;">Очистить историю</button>
+						</div>
+					</details>
+				</div>
+			</div>
 				<select id="searchType">
 					<option value="">Все типы</option>
 					<option value="default">Обычный маркер</option>
@@ -108,9 +122,10 @@
 				</select>
                 <div class="search-buttons">
                     <button id="searchBtn">Поиск</button>
-                    <button id="showAllBtn" style="display:none;">Показать все</button>
-                    <button id="hideOthersBtn">Скрыть остальные</button>
-					<button id="exportFilteredToServersBtn" style="display:none;">Экспорт найденных</button>
+                    <div class="second-row-buttons">
+						<button id="bulkEditBtn" style="display:none;">Массовое редактирование</button>
+						<button id="exportFilteredToServersBtn" style="display:none;">Экспорт найденных</button>
+                    </div>
                 </div>
             </div>
             
@@ -132,12 +147,8 @@
                 <div id="markersContainer"></div>
             </div>
          
-            <!-- Общая прозрачность всех меток -->
-            <div class="control-group">
-                <label>Общая прозрачность:</label>
-                <input type="range" id="globalOpacity" min="0" max="100" value="80">
-                <span id="globalOpacityValue">80%</span>
-            </div>
+            <!-- Кнопка показа/скрытия всех меток -->
+            <button id="toggleMarkersBtn" class="toggle-markers-btn">Скрыть все метки</button>
 			
             <!-- Блок с информацией о поддержке -->
             <div class="support-info">
@@ -157,6 +168,11 @@
                     </a>
                 </div>
             </div>
+
+            <!-- Кнопка перехода к руководству -->
+            <a href="guide/user_guide.html" class="guide-button" title="Открыть руководство пользователя">
+                📖 Руководство пользователя
+            </a>
         </div>
     </div>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

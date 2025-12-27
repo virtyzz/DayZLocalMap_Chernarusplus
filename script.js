@@ -12,11 +12,11 @@ const CONFIG = {
     // Конфигурация для разных уровней тайлов
     tileSets: {
         high: {
-            folder: 'tiles_cropped',
+            folder: 'tiles_high',
             prefix: 'S',
             format: 3,
             gridSize: 32,
-            zoomLevels: [10, 11, 12],
+            zoomLevels: [11, 11.5, 12],
             scale: 1
         },
         medium: {
@@ -24,7 +24,7 @@ const CONFIG = {
             prefix: 'L',
             format: 2,
             gridSize: 16,
-            zoomLevels: [7, 8, 9],
+            zoomLevels: [9, 9.5, 10, 10.5],
             scale: 2
         },
         low: {
@@ -32,22 +32,34 @@ const CONFIG = {
             prefix: 'L',
             format: 2,
             gridSize: 8,
-            zoomLevels: [5, 6],
+            zoomLevels: [7, 7.5, 8, 8.5],
             scale: 4
+        },
+        minimal: {
+            folder: 'tiles_minimal',
+            prefix: 'L',
+            format: 2,
+            gridSize: 8,
+            zoomLevels: [5, 5.5, 6, 6.5],
+            scale: 8
         }
     },
 
     // Конфигурация ленивой загрузки
     lazyLoading: {
         enabled: true,
-        buffer: 1,
-        throttleDelay: 250
+        buffer: 3,
+        throttleDelay: 100,
+        maxConcurrentLoads: 8,
+        preloadBuffer: 4,
+        unloadDelay: 500,
+        memoryLimit: 100
     }
 };
 
 // Константы для типов меток
 const MARKER_TYPES = {
-    default: { name: 'Обычный маркер', color: '#3498db', symbol: '' },
+    default: { name: 'Обычный маркер', color: '#3498db', symbol: '⛯' },
     cross: { name: 'X', color: '#3498db', symbol: 'X' },
     home: { name: 'Дом H', color: '#e74c3c', symbol: 'H' },
     camp: { name: 'Лагерь C', color: '#27ae60', symbol: 'C' },
@@ -94,7 +106,7 @@ class DayZMap {
         this.gridLayer = null;
         this.axisLayer = null;
         this.editingMarker = null;
-        this.globalMarkerOpacity = 0.8; // 80%
+        this.markersVisible = true; // Состояние видимости всех меток
         this.searchFilter = '';
         this.filteredMarkers = [];
         this.isFilterActive = false;
@@ -104,11 +116,16 @@ class DayZMap {
             color: '#3498db'
         };
         this.modalCloseHandlers = new Map(); // Для управления обработчиками модальных окон
-		this.lastTileSet = 'high';
+		this.lastTileSet = 'minimal';
 		this.loadedTiles = new Set(); // отслеживаем загруженные тайлы
 		this.lastLoadBounds = null; // последняя загруженная область
 		this.loadThrottle = null; // для троттлинга
 		this.currentTileLayers = new Map(); // храним ссылки на загруженные тайлы
+		this.tileLoadGeneration = 0;
+		this.tileUnloadTimeout = null;
+		this.saveMarkersTimeout = null;
+		this.pendingSaveData = null;
+		this.updateMarkersListScheduled = false;
 		this.markersLoaded = false;
 		this.gridLoaded = false;
 		this.currentSort = {
@@ -122,9 +139,11 @@ class DayZMap {
         this.nearbySearchRadius = 500; // радиус по умолчанию в метрах игровых координат
         this.nearbyMarkers = [];
         this.nearbyCircle = null;
-        this.originalMarkerParams = null; // для сохранения параметров формы
-        this.currentMarkerPosition = null; // для сохранения позиции новой метки
+		this.originalMarkerParams = null; // для сохранения параметров формы
+		this.currentMarkerPosition = null; // для сохранения позиции новой метки
 		this.temporaryAddMarker = null; // Временный маркер при добавлении
+		this.searchHistory = []; // История поиска
+		this.maxSearchHistory = 10; // Максимальное количество элементов в истории
         this.init();
     }
 
@@ -191,6 +210,7 @@ class DayZMap {
 
     init() {
         console.log('Инициализация карты...');
+        this.loadSearchHistory(); // Загружаем историю поиска
         this.initMap();
         this.bindEvents();
     }
@@ -295,8 +315,10 @@ class DayZMap {
         if (this.shouldReloadTiles(pixelBounds)) {
             console.log(`Загрузка видимых тайлов (${tileSet}): ${pixelBounds.minX}-${pixelBounds.maxX}, ${pixelBounds.minY}-${pixelBounds.maxY}`);
             
-            await this.loadTilesInBounds(pixelBounds, tileSet);
-            this.lastLoadBounds = pixelBounds;
+            this.tileLoadGeneration++;
+			const generation = this.tileLoadGeneration;
+			await this.loadTilesInBounds(pixelBounds, tileSet, generation);
+			this.lastLoadBounds = pixelBounds;
         }
     }
 
@@ -329,10 +351,8 @@ class DayZMap {
     }
 	
 	//загрузка тайлов в области
-	async loadTilesInBounds(bounds, tileSet) {
+	async loadTilesInBounds(bounds, tileSet, generation) {
         const config = CONFIG.tileSets[tileSet];
-        const promises = [];
-        
         const tilesToLoad = [];
         for (let x = bounds.minX; x <= bounds.maxX; x++) {
             for (let y = bounds.minY; y <= bounds.maxY; y++) {
@@ -345,89 +365,193 @@ class DayZMap {
         }
         
         if (tilesToLoad.length === 0) {
-            console.log('Все видимые тайлы уже загружены');
+            console.log('Видимые тайлы уже загружены');
             return;
         }
         
         console.log(`Загружаем ${tilesToLoad.length} новых тайлов`);
-        
-        for (const tile of tilesToLoad) {
-            const promise = this.loadSingleTile(tile.x, tile.y, tileSet)
-                .then(layer => {
-                    if (layer) {
-                        this.loadedTiles.add(tile.key);
-                        this.currentTileLayers.set(tile.key, layer);
-                    }
-                    return { success: true, tile: tile.key };
-                })
-                .catch(error => {
-                    console.error(`Ошибка загрузки тайла ${tile.key}:`, error);
-                    return { success: false, tile: tile.key, error: error.message };
-                });
-            
-            promises.push(promise);
-        }
-        
-        this.unloadOutOfBoundsTiles(bounds, tileSet);
-        
-        const results = await Promise.allSettled(promises);
-        const loaded = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
-        const errors = results.length - loaded;
-        
-        if (errors > 0) {
-            console.warn(`Загружено ${loaded} тайлов, ошибок: ${errors}`);
-        }
+
+		const centerX = (bounds.minX + bounds.maxX) / 2;
+		const centerY = (bounds.minY + bounds.maxY) / 2;
+		tilesToLoad.sort((a, b) => {
+			const da = (a.x - centerX) * (a.x - centerX) + (a.y - centerY) * (a.y - centerY);
+			const db = (b.x - centerX) * (b.x - centerX) + (b.y - centerY) * (b.y - centerY);
+			return da - db;
+		});
+
+		const concurrency = Math.max(1, CONFIG.lazyLoading.maxConcurrentLoads || 8);
+		let cursor = 0;
+		let loaded = 0;
+		let errors = 0;
+
+		const worker = async () => {
+			while (cursor < tilesToLoad.length) {
+				if (generation !== this.tileLoadGeneration) return;
+				const tile = tilesToLoad[cursor++];
+				try {
+					const layer = await this.loadSingleTile(tile.x, tile.y, tileSet, generation);
+					if (layer) {
+						this.loadedTiles.add(tile.key);
+						this.currentTileLayers.set(tile.key, layer);
+						loaded++;
+					}
+				} catch (error) {
+					errors++;
+				}
+			}
+		};
+
+		const workers = [];
+		for (let i = 0; i < Math.min(concurrency, tilesToLoad.length); i++) {
+			workers.push(worker());
+		}
+		await Promise.allSettled(workers);
+
+		this.scheduleUnloadOutOfBoundsTiles(bounds, tileSet);
+
+		if (errors > 0) {
+			console.warn(`Загружено ${loaded} тайлов, ошибок: ${errors}`);
+		}
     }
 	
-	//загрузка одного тайла
-	loadSingleTile(x, y, tileSet) {
+	//загрузка одного тайла (временно без прогрессивной загрузки)
+	loadSingleTile(x, y, tileSet, generation) {
         return new Promise((resolve, reject) => {
             const config = CONFIG.tileSets[tileSet];
             const fileName = this.getTileFileName(x, y, tileSet);
             const url = `${config.folder}/${fileName}`;
             const bounds = this.tileToLeafletBounds(x, y, tileSet);
             
-            const img = new Image();
-            let timeoutId;
-            
-            img.onload = () => {
-                clearTimeout(timeoutId);
-                try {
-                    const layer = L.imageOverlay(url, bounds).addTo(this.map);
-                    resolve(layer);
-                } catch (error) {
-                    reject(error);
-                }
-            };
-            
-            img.onerror = () => {
-                clearTimeout(timeoutId);
-                reject(new Error(`Не удалось загрузить: ${fileName}`));
-            };
-            
-            img.src = url;
-            
-            timeoutId = setTimeout(() => {
-                reject(new Error(`Таймаут загрузки: ${fileName}`));
-            }, 10000);
+			this.loadTileDirectly(url, bounds, fileName, generation, resolve, reject);
         });
     }
+
+    // Загрузка тайла напрямую
+    loadTileDirectly(url, bounds, fileName, generation, resolve, reject) {
+		// Обратная совместимость со старой сигнатурой (url,bounds,fileName,resolve,reject)
+		if (typeof generation === 'function') {
+			reject = resolve;
+			resolve = generation;
+			generation = this.tileLoadGeneration;
+		}
+
+        const img = new Image();
+        let timeoutId;
+        
+        img.onload = () => {
+            clearTimeout(timeoutId);
+			if (generation !== this.tileLoadGeneration) {
+				resolve(null);
+				return;
+			}
+            try {
+                const layer = L.imageOverlay(url, bounds).addTo(this.map);
+                resolve(layer);
+            } catch (error) {
+                reject(error);
+            }
+        };
+        
+        img.onerror = () => {
+            clearTimeout(timeoutId);
+            reject(new Error(`Не удалось загрузить: ${fileName}`));
+        };
+        
+        img.src = url;
+        
+        timeoutId = setTimeout(() => {
+            reject(new Error(`Таймаут загрузки: ${fileName}`));
+        }, 8000);
+    }
+
+	scheduleUnloadOutOfBoundsTiles(currentBounds, tileSet) {
+		if (this.tileUnloadTimeout) {
+			clearTimeout(this.tileUnloadTimeout);
+		}
+		const delay = CONFIG.lazyLoading.unloadDelay || 0;
+		this.tileUnloadTimeout = setTimeout(() => {
+			this.unloadOutOfBoundsTiles(currentBounds, tileSet);
+		}, delay);
+	}
+
+    // Прогрессивная загрузка
+    loadProgressiveTile(x, y, highResSet, lowResSet, resolve, reject) {
+        const lowResConfig = CONFIG.tileSets[lowResSet];
+        const lowResFileName = this.getTileFileName(x, y, lowResSet);
+        const lowResUrl = `${lowResConfig.folder}/${lowResFileName}`;
+        const bounds = this.tileToLeafletBounds(x, y, highResSet);
+        
+        // Загружаем низкое качество сначала
+        this.loadTileDirectly(lowResUrl, bounds, lowResFileName, (lowLayer) => {
+            // После загрузки низкого качества загружаем высокое
+            const highResConfig = CONFIG.tileSets[highResSet];
+            const highResFileName = this.getTileFileName(x, y, highResSet);
+            const highResUrl = `${highResConfig.folder}/${highResFileName}`;
+            
+            this.loadTileDirectly(highResUrl, bounds, highResFileName, (highLayer) => {
+                // Заменяем низкое качество на высокое
+                this.map.removeLayer(lowLayer);
+                resolve(highLayer);
+            }, reject);
+        }, reject);
+    }
+
+    // Получить набор тайлов более низкого разрешения
+    getLowerResolutionSet(currentSet) {
+        const sets = ['high', 'medium', 'low', 'minimal'];
+        const currentIndex = sets.indexOf(currentSet);
+        return currentIndex < sets.length - 1 ? sets[currentIndex + 1] : null;
+    }
+
+    // Проверить, нужно ли использовать прогрессивную загрузку
+    shouldUseProgressive(tileSet) {
+        return ['high'].includes(tileSet);
+    }
 	
-	//выгрузка невидимых тайлов
+	//выгрузка невидимых тайлов с оптимизацией памяти
 	unloadOutOfBoundsTiles(currentBounds, tileSet) {
         const tilesToRemove = [];
+        const buffer = CONFIG.lazyLoading.buffer;
+        const memoryLimit = CONFIG.lazyLoading.memoryLimit;
+        
+        // Проверяем лимит памяти
+        if (this.loadedTiles.size > memoryLimit) {
+            console.log(`Превышен лимит памяти: ${this.loadedTiles.size} > ${memoryLimit}`);
+        }
         
         for (const tileKey of this.loadedTiles) {
             if (!tileKey.startsWith(tileSet + '_')) continue;
             
             const [_, x, y] = tileKey.split('_').map(Number);
             
-            if (x < currentBounds.minX || x > currentBounds.maxX || 
-                y < currentBounds.minY || y > currentBounds.maxY) {
+            // Более агрессивная выгрузка при превышении лимита памяти
+            const unloadBuffer = this.loadedTiles.size > memoryLimit ? 0 : buffer;
+            
+            if (x < currentBounds.minX - unloadBuffer || 
+                x > currentBounds.maxX + unloadBuffer || 
+                y < currentBounds.minY - unloadBuffer || 
+                y > currentBounds.maxY + unloadBuffer) {
                 tilesToRemove.push(tileKey);
             }
         }
         
+        // Сортируем по расстоянию от центра видимой области
+        if (tilesToRemove.length > 0) {
+            const centerX = (currentBounds.minX + currentBounds.maxX) / 2;
+            const centerY = (currentBounds.minY + currentBounds.maxY) / 2;
+            
+            tilesToRemove.sort((a, b) => {
+                const [ax, ay] = a.split('_').map(Number);
+                const [bx, by] = b.split('_').map(Number);
+                
+                const distA = Math.sqrt(Math.pow(ax - centerX, 2) + Math.pow(ay - centerY, 2));
+                const distB = Math.sqrt(Math.pow(bx - centerX, 2) + Math.pow(by - centerY, 2));
+                
+                return distB - distA; // Удаляем самые дальние сначала
+            });
+        }
+        
+        // Выгружаем тайлы
         tilesToRemove.forEach(tileKey => {
             const layer = this.currentTileLayers.get(tileKey);
             if (layer) {
@@ -438,7 +562,7 @@ class DayZMap {
         });
         
         if (tilesToRemove.length > 0) {
-            console.log(`Выгружено ${tilesToRemove.length} тайлов вне видимой области`);
+            console.log(`Выгружено ${tilesToRemove.length} тайлов, всего загружено: ${this.loadedTiles.size}`);
         }
     }
 	
@@ -466,7 +590,7 @@ class DayZMap {
 			color: white;
 			padding: 20px;
 			border-radius: 8px;
-			z-index: 1000;
+			z-index: 10001;
 			text-align: center;
 			border: 2px solid #3498db;
 			min-width: 300px;
@@ -588,7 +712,7 @@ class DayZMap {
             color: white;
             padding: 20px;
             border-radius: 8px;
-            z-index: 1000;
+            z-index: 10001;
             text-align: center;
             max-width: 80%;
             border: 2px solid #c0392b;
@@ -670,7 +794,7 @@ class DayZMap {
             color: white;
             padding: 10px 20px;
             border-radius: 5px;
-            z-index: 1000;
+            z-index: 10001;
             text-align: center;
             max-width: 80%;
             font-weight: bold;
@@ -748,19 +872,13 @@ class DayZMap {
 				});
 			}
 
-            const showAllBtn = document.getElementById('showAllBtn');
-            if (showAllBtn) {
-                showAllBtn.addEventListener('click', () => {
-                    this.clearSearch();
-                });
-            }
-
-            const hideOthersBtn = document.getElementById('hideOthersBtn');
-            if (hideOthersBtn) {
-                hideOthersBtn.addEventListener('click', () => {
-                    this.hideOtherMarkers();
-                });
-            }
+			// Обработчик для кнопки массового редактирования
+			const bulkEditBtn = document.getElementById('bulkEditBtn');
+			if (bulkEditBtn) {
+				bulkEditBtn.addEventListener('click', () => {
+					this.showBulkEditModal();
+				});
+			}
 			
 			// Кнопка для экспорта на серверы
 			const exportToServersButton = document.createElement('button');
@@ -779,6 +897,15 @@ class DayZMap {
 			if (exportFilteredToServersBtn) {
 				exportFilteredToServersBtn.addEventListener('click', () => {
 					this.exportFilteredMarkersToServers();
+				});
+			}
+			
+			// Обработчик для кнопки очистки истории поиска
+			const clearSearchHistoryBtn = document.getElementById('clearSearchHistory');
+			if (clearSearchHistoryBtn) {
+				clearSearchHistoryBtn.addEventListener('click', (e) => {
+					e.stopPropagation(); // Предотвращаем закрытие details
+					this.clearSearchHistory();
 				});
 			}
 
@@ -854,17 +981,11 @@ class DayZMap {
 				});
 			}
 
-            // Обработчик общей прозрачности  
-            const globalOpacitySlider = document.getElementById('globalOpacity');
-            if (globalOpacitySlider) {
-                globalOpacitySlider.addEventListener('input', (e) => {
-                    const value = e.target.value;
-                    const opacityValueElement = document.getElementById('globalOpacityValue');
-                    if (opacityValueElement) {
-                        opacityValueElement.textContent = `${value}%`;
-                    }
-                    this.globalMarkerOpacity = value / 100;
-                    this.updateAllMarkersOpacity();
+            // Обработчик кнопки показа/скрытия всех меток
+            const toggleMarkersBtn = document.getElementById('toggleMarkersBtn');
+            if (toggleMarkersBtn) {
+                toggleMarkersBtn.addEventListener('click', () => {
+                    this.toggleAllMarkersVisibility();
                 });
             }
 			
@@ -965,7 +1086,7 @@ class DayZMap {
 					this.showCoordsHelp2(); // Будет другой текст подсказки
 				});
 			}
-			
+		
         } catch (error) {
             console.error('Ошибка при привязке событий:', error);
         }
@@ -1349,7 +1470,7 @@ class DayZMap {
             color: white;
             padding: 5px 10px;
             border-radius: 3px;
-            z-index: 1000;
+            z-index: 10001;
             font-family: monospace;
         `;
         document.getElementById('map').appendChild(coordsDiv);
@@ -1479,8 +1600,6 @@ class DayZMap {
 			this.cleanupNearbySearch();
 		});
 		
-		
-
 		// Создаем цветовую палитру
 		this.createColorPalette('colorPalette', 'newColorR', 'newColorG', 'newColorB', 'newColorPreview');
 
@@ -1532,12 +1651,11 @@ class DayZMap {
 	// Вспомогательный метод для получения текущих параметров формы
 	getCurrentFormParams() {
 		return {
-			text: document.getElementById('newMarkerText').value || 'Метка',
+			text: document.getElementById('newMarkerText').value,
 			type: document.getElementById('newMarkerType').value,
 			color: document.getElementById('newColorPreview').style.backgroundColor
 		};
 	}
-
 
 	closeModal(modal) {
 		if (!modal) return;
@@ -1598,7 +1716,7 @@ class DayZMap {
     saveNewMarker(leafletLatLng, gameCoords) {
 		console.log('💾 Сохранение новой метки');
 		this.cleanupNearbySearch();
-		const markerText = document.getElementById('newMarkerText').value || 'Метка';
+		const markerText = document.getElementById('newMarkerText').value;
 		const markerType = document.getElementById('newMarkerType').value;
 		const r = document.getElementById('newColorR').value;
 		const g = document.getElementById('newColorG').value;
@@ -1619,12 +1737,23 @@ class DayZMap {
 			return;
 		}
 
-		const opacity = this.globalMarkerOpacity;
+		const opacity = 1.0;
 		const icon = this.createMarkerIcon(markerType, markerColor, opacity);
 
-		const marker = L.marker(leafletLatLng, { icon: icon })
-			.addTo(this.map)
-			.bindPopup(`
+		const marker = L.marker(leafletLatLng, { icon: icon });
+
+		const textLabel = L.marker(leafletLatLng, {
+			icon: this.createTextLabel(markerText, markerColor, opacity),
+			interactive: false
+		});
+
+		// Добавляем метки на карту только если они видимы
+		if (this.markersVisible) {
+			marker.addTo(this.map);
+			textLabel.addTo(this.map);
+		}
+
+		marker.bindPopup(`
 				<div class="marker-popup">
 					<strong>${markerText}</strong>
 					<br>
@@ -1632,11 +1761,6 @@ class DayZMap {
 					Координаты: X:${gameCoords.x} Y:${gameCoords.y}${gameCoords.z ? ` Z:${gameCoords.z}` : ''}
 				</div>
 			`);
-
-		const textLabel = L.marker(leafletLatLng, {
-			icon: this.createTextLabel(markerText, markerColor, opacity),
-			interactive: false
-		}).addTo(this.map);
 
 		// Для новых меток создаем базовый набор оригинальных данных С Z КООРДИНАТОЙ
 		const originalData = {
@@ -1695,7 +1819,7 @@ class DayZMap {
 		this.showSuccess('Метка добавлена');
 	}
 
-    createMarkerIcon(type, customColor = null, opacity = this.globalMarkerOpacity) {
+    createMarkerIcon(type, customColor = null, opacity = 1.0) {
         const markerType = MARKER_TYPES[type] || MARKER_TYPES.default;
         const color = customColor || markerType.color;
 
@@ -1722,7 +1846,7 @@ class DayZMap {
         });
     }
 
-    createTextLabel(text, color, opacity = this.globalMarkerOpacity) {
+    createTextLabel(text, color, opacity = 1.0) {
         return L.divIcon({
             className: 'text-label',
             html: `<div style="
@@ -2056,10 +2180,10 @@ class DayZMap {
 			};
 		}
 
-		const newIcon = this.createMarkerIcon(newType, newColor, this.globalMarkerOpacity);
+		const newIcon = this.createMarkerIcon(newType, newColor, 1.0);
 		markerData.marker.setIcon(newIcon);
 
-		const newTextLabel = this.createTextLabel(newText, newColor, this.globalMarkerOpacity);
+		const newTextLabel = this.createTextLabel(newText, newColor, 1.0);
 		markerData.textLabel.setIcon(newTextLabel);
 
 		markerData.marker.bindPopup(`
@@ -2119,16 +2243,23 @@ class DayZMap {
     }
 
     updateMarkersList() {
+		if (this.updateMarkersListScheduled) return;
+		this.updateMarkersListScheduled = true;
+		requestAnimationFrame(() => {
+			this.updateMarkersListScheduled = false;
+			this.renderMarkersList();
+		});
+	}
+
+	renderMarkersList() {
 		const container = document.getElementById('markersContainer');
 		if (!container) return;
-		
 		container.innerHTML = '';
-		
-		// Получаем метки для отображения и сортируем их
-		let markersToShow = this.isFilterActive ? this.filteredMarkers : this.markers; // Ключевое изменение!
+
+		let markersToShow = this.isFilterActive ? this.filteredMarkers : this.markers;
 		markersToShow = this.sortMarkers(markersToShow);
-		
-		if (this.isFilterActive && markersToShow.length === 0) { // Используем isFilterActive вместо searchFilter
+
+		if (this.isFilterActive && markersToShow.length === 0) {
 			container.innerHTML = `<div class="no-results">Метки по заданным критериям не найдены</div>`;
 		} else {
 			markersToShow.forEach(markerData => {
@@ -2144,52 +2275,45 @@ class DayZMap {
 					</div>
 					<button class="delete" onclick="dayzMap.removeMarker(${markerData.id})">×</button>
 				`;
-				
-				// Обработчик двойного клика для центрирования и зума
+
 				item.addEventListener('dblclick', (e) => {
 					if (!e.target.classList.contains('delete')) {
-						// Центрируем карту на метке с зумом 8
 						this.map.setView(markerData.leafletLatLng, 8);
-						// Открываем попап метки
-						markerData.marker.openPopup();
-						
-						// Показываем анимацию или подсветку для визуальной обратной связи
 						this.highlightMarker(markerData);
+						markerData.marker.openPopup();
 					}
 				});
-				
-				// Обычный клик (одинарный) - просто центрируем без зума
+
 				item.addEventListener('click', (e) => {
 					if (!e.target.classList.contains('delete')) {
-						// Просто центрируем на метке без изменения зума
 						this.map.setView(markerData.leafletLatLng);
-						markerData.marker.openPopup();
-						
-						// Показываем анимацию или подсветку для визуальной обратной связи
 						this.highlightMarker(markerData);
+						markerData.marker.openPopup();
 					}
 				});
-				
+
 				container.appendChild(item);
 			});
 		}
 
-		// Обновляем счетчик и состояние кнопок
 		this.updateMarkersCounter();
 		this.updateSearchButtons();
 	}
 	
 	// Добавьте метод для подсветки метки при выборе
 	highlightMarker(markerData) {
-		// Временно добавляем класс для подсветки
-		markerData.marker.getElement().classList.add('marker-highlighted');
-		
-		// Убираем подсветку через 2 секунды
-		setTimeout(() => {
-			if (markerData.marker.getElement()) {
-				markerData.marker.getElement().classList.remove('marker-highlighted');
-			}
-		}, 2000);
+		// Временно добавляем класс для подсветки (без анимации)
+		const element = markerData.marker.getElement();
+		if (element) {
+			element.classList.add('marker-highlighted');
+			
+			// Убираем подсветку через 2 секунды
+			setTimeout(() => {
+				if (element) {
+					element.classList.remove('marker-highlighted');
+				}
+			}, 2000);
+		}
 		
 		// Также подсвечиваем соответствующий элемент в списке
 		const markerItems = document.querySelectorAll('.marker-item');
@@ -2220,11 +2344,10 @@ class DayZMap {
     // Метод для обновления состояния кнопок
     updateSearchButtons() {
 		const searchBtn = document.getElementById('searchBtn');
-		const showAllBtn = document.getElementById('showAllBtn');
-		const hideOthersBtn = document.getElementById('hideOthersBtn');
 		const exportFilteredToServersBtn = document.getElementById('exportFilteredToServersBtn'); // Новая кнопка
+		const bulkEditBtn = document.getElementById('bulkEditBtn'); // Кнопка массового редактирования
 
-		if (!searchBtn || !showAllBtn || !hideOthersBtn || !exportFilteredToServersBtn) return;
+		if (!searchBtn || !exportFilteredToServersBtn || !bulkEditBtn) return;
 
 		const searchType = document.getElementById('searchType').value;
 		const searchInput = document.getElementById('searchMarkers');
@@ -2234,34 +2357,34 @@ class DayZMap {
 
 		if (hasActiveFilter) {
 			searchBtn.textContent = 'Отменить';
-			searchBtn.style.background = '#e74c3c';
-			showAllBtn.style.display = 'inline-block';
+			searchBtn.classList.add('cancel-mode');
 			exportFilteredToServersBtn.style.display = 'inline-block';
+			bulkEditBtn.style.display = 'inline-block';
 			
 			// Обновляем состояние кнопок
 			const hasResults = this.filteredMarkers.length > 0;
-			hideOthersBtn.disabled = !hasResults;
 			exportFilteredToServersBtn.disabled = !hasResults;
+			bulkEditBtn.disabled = !hasResults;
 			
 			// Обновляем подсказки
 			if (!hasResults) {
-				hideOthersBtn.title = 'Нет найденных меток для отображения';
 				exportFilteredToServersBtn.title = 'Нет найденных меток для экспорта на серверы';
+				bulkEditBtn.title = 'Нет найденных меток для редактирования';
 			} else {
-				hideOthersBtn.title = '';
 				exportFilteredToServersBtn.title = `Экспортировать ${this.filteredMarkers.length} найденных меток на серверы`;
+				bulkEditBtn.title = `Редактировать ${this.filteredMarkers.length} найденных меток`;
 			}
 		} else {
 			searchBtn.textContent = 'Поиск';
-			searchBtn.style.background = '';
-			showAllBtn.style.display = 'none';
+			searchBtn.classList.remove('cancel-mode');
 			exportFilteredToServersBtn.style.display = 'none'; // Скрываем новую кнопку
+			bulkEditBtn.style.display = 'none'; // Скрываем кнопку массового редактирования
 			
 			// Сбрасываем состояние
-			hideOthersBtn.disabled = true;
 			exportFilteredToServersBtn.disabled = true;
-			hideOthersBtn.title = 'Сначала выполните поиск';
+			bulkEditBtn.disabled = true;
 			exportFilteredToServersBtn.title = 'Сначала выполните поиск';
+			bulkEditBtn.title = 'Сначала выполните поиск';
 		}
 	}
 	
@@ -2277,12 +2400,21 @@ class DayZMap {
                 originalData: m.originalData // Сохраняем оригинальные данные
             })),
             settings: {
-                globalOpacity: this.globalMarkerOpacity,
+                markersVisible: this.markersVisible,
                 lastMarkerParams: this.lastMarkerParams
             }
         };
-		console.log('Сохраняемые данные:', data); // Отладочная информация
-        localStorage.setItem('dayzMapData', JSON.stringify(data));
+        this.pendingSaveData = data;
+		if (this.saveMarkersTimeout) {
+			clearTimeout(this.saveMarkersTimeout);
+		}
+		this.saveMarkersTimeout = setTimeout(() => {
+			try {
+				localStorage.setItem('dayzMapData', JSON.stringify(this.pendingSaveData));
+			} catch (e) {
+				console.error('Ошибка сохранения меток:', e);
+			}
+		}, 500);
     }
 
     clearAllMarkers() {
@@ -2358,19 +2490,16 @@ class DayZMap {
 				
 				// Загружаем настройки
 				if (data.settings) {
-					this.globalMarkerOpacity = data.settings.globalOpacity || 0.8;
+					this.markersVisible = data.settings.markersVisible !== undefined ? data.settings.markersVisible : true;
 					
 					if (data.settings.lastMarkerParams) {
 						this.lastMarkerParams = data.settings.lastMarkerParams;
 					}
 					
-					// Обновляем слайдеры
-					const globalOpacitySlider = document.getElementById('globalOpacity');
-					const globalOpacityValue = document.getElementById('globalOpacityValue');
-					
-					if (globalOpacitySlider && globalOpacityValue) {
-						globalOpacitySlider.value = this.globalMarkerOpacity * 100;
-						globalOpacityValue.textContent = `${Math.round(this.globalMarkerOpacity * 100)}%`;
+					// Обновляем кнопку
+					const toggleBtn = document.getElementById('toggleMarkersBtn');
+					if (toggleBtn) {
+						toggleBtn.textContent = this.markersVisible ? 'Скрыть все метки' : 'Показать все метки';
 					}
 				}
 				
@@ -2392,22 +2521,28 @@ class DayZMap {
 						);
 						
 						const color = savedMarkerData.color || this.getMarkerColor(savedMarkerData.type);
-						const icon = this.createMarkerIcon(savedMarkerData.type, color, this.globalMarkerOpacity);
+						const icon = this.createMarkerIcon(savedMarkerData.type, color, 1.0);
 
-						const marker = L.marker(leafletLatLng, { icon: icon })
-							.addTo(this.map)
-							.bindPopup(`
-								<div class="marker-popup">
-									<strong>${savedMarkerData.text}</strong><br>
-									Тип: ${this.getMarkerTypeName(savedMarkerData.type)}<br>
-									Координаты: X:${savedMarkerData.gameCoords.x} Y:${savedMarkerData.gameCoords.y}${savedMarkerData.gameCoords.z ? ` Z:${savedMarkerData.gameCoords.z}` : ''}
-								</div>
-							`);
+						const marker = L.marker(leafletLatLng, { icon: icon });
+
+						marker.bindPopup(`
+							<div class="marker-popup">
+								<strong>${savedMarkerData.text}</strong><br>
+								Тип: ${this.getMarkerTypeName(savedMarkerData.type)}<br>
+								Координаты: X:${savedMarkerData.gameCoords.x} Y:${savedMarkerData.gameCoords.y}${savedMarkerData.gameCoords.z ? ` Z:${savedMarkerData.gameCoords.z}` : ''}
+							</div>
+						`);
 
 						const textLabel = L.marker(leafletLatLng, {
-							icon: this.createTextLabel(savedMarkerData.text, color, this.globalMarkerOpacity),
+							icon: this.createTextLabel(savedMarkerData.text, color, 1.0),
 							interactive: false
-						}).addTo(this.map);
+						});
+
+						// Добавляем метки на карту только если они видимы
+						if (this.markersVisible) {
+							marker.addTo(this.map);
+							textLabel.addTo(this.map);
+						}
 
 						// ВОССТАНАВЛИВАЕМ Z КООРДИНАТУ ПРИ ЗАГРУЗКЕ
 						const markerData = {
@@ -2438,7 +2573,152 @@ class DayZMap {
 				console.error('Ошибка загрузки меток:', e);
 			}
 		}
-		this.updateAllMarkersOpacity();
+	}
+
+	// Методы для работы с историей поиска
+	saveSearchHistory() {
+		try {
+			localStorage.setItem('dayzMapSearchHistory', JSON.stringify(this.searchHistory));
+		} catch (e) {
+			console.error('Ошибка сохранения истории поиска:', e);
+		}
+	}
+
+	loadSearchHistory() {
+		try {
+			const saved = localStorage.getItem('dayzMapSearchHistory');
+			if (saved) {
+				this.searchHistory = JSON.parse(saved);
+				// Ограничиваем количество элементов в истории
+				if (this.searchHistory.length > this.maxSearchHistory) {
+					this.searchHistory = this.searchHistory.slice(0, this.maxSearchHistory);
+				}
+			}
+			// Инициализируем UI после загрузки истории
+			this.updateSearchHistoryUI();
+		} catch (e) {
+			console.error('Ошибка загрузки истории поиска:', e);
+			this.searchHistory = [];
+			this.updateSearchHistoryUI();
+		}
+	}
+
+	addToSearchHistory(searchTerm, searchType = '') {
+		// Не добавляем пустые запросы или дубликаты
+		if (!searchTerm.trim()) return;
+		
+		// Проверяем, есть ли уже такой запрос в истории
+		const existingIndex = this.searchHistory.findIndex(item => 
+			item.term === searchTerm && item.type === searchType
+		);
+		
+		if (existingIndex !== -1) {
+			// Если есть, перемещаем его в начало
+			this.searchHistory.splice(existingIndex, 1);
+		}
+		
+		// Добавляем новый запрос в начало
+		this.searchHistory.unshift({
+			term: searchTerm,
+			type: searchType,
+			timestamp: Date.now()
+		});
+		
+		// Ограничиваем количество элементов
+		if (this.searchHistory.length > this.maxSearchHistory) {
+			this.searchHistory = this.searchHistory.slice(0, this.maxSearchHistory);
+		}
+		
+		this.saveSearchHistory();
+		this.updateSearchHistoryUI();
+	}
+
+	clearSearchHistory() {
+		this.searchHistory = [];
+		this.saveSearchHistory();
+		this.updateSearchHistoryUI();
+	}
+
+	updateSearchHistoryUI() {
+		const list = document.getElementById('searchHistoryList');
+		const count = document.getElementById('searchHistoryCount');
+		const details = document.getElementById('searchHistoryDetails');
+		
+		if (!list || !count) return;
+		
+		// Очищаем список
+		list.innerHTML = '';
+		
+		// Обновляем счетчик
+		count.textContent = `(${this.searchHistory.length})`;
+		
+		if (this.searchHistory.length === 0) {
+			// Показываем сообщение об пустой истории
+			list.innerHTML = '<div class="search-history-empty">История поиска пуста</div>';
+			// Скрываем детали если история пуста
+			if (details) {
+				details.style.display = 'none';
+			}
+			return;
+		}
+		
+		// Показываем детали если есть история, но не открываем их автоматически
+		if (details) {
+			details.style.display = 'block';
+			// Убедимся что детали свернуты
+			details.open = false;
+		}
+		
+		// Добавляем элементы для каждого записи в истории
+		this.searchHistory.forEach(item => {
+			const historyItem = document.createElement('div');
+			historyItem.className = 'search-history-item';
+			
+			const typeText = item.type ? this.getMarkerTypeName(item.type) : '';
+			const displayText = typeText ? `${item.term} (${typeText})` : item.term;
+			
+			historyItem.innerHTML = `
+				<span class="search-history-text">${this.escapeHtml(displayText)}</span>
+			`;
+			
+			// Добавляем обработчик клика
+			historyItem.addEventListener('click', () => {
+				this.applySearchFromHistory(item);
+			});
+			
+			list.appendChild(historyItem);
+		});
+	}
+
+	applySearchFromHistory(historyItem) {
+		const searchInput = document.getElementById('searchMarkers');
+		const searchTypeSelect = document.getElementById('searchType');
+		
+		if (searchInput) {
+			searchInput.value = historyItem.term;
+		}
+		
+		if (searchTypeSelect) {
+			searchTypeSelect.value = historyItem.type || '';
+		}
+		
+		// Выполняем поиск
+		this.searchMarkers(historyItem.term);
+		
+		// Закрываем детали после выбора
+		const details = document.getElementById('searchHistoryDetails');
+		if (details) {
+			details.open = false;
+		}
+	}
+
+	// Удаляем неиспользуемые методы
+	// showSearchHistory и hideSearchHistory больше не нужны
+
+	escapeHtml(text) {
+		const div = document.createElement('div');
+		div.textContent = text;
+		return div.innerHTML;
 	}
 
     // Функция для массовой загрузки меток из JSON
@@ -2522,25 +2802,33 @@ class DayZMap {
                             const gameCoords = { x: Math.round(x), y: Math.round(y), z: z };
 
                             // Создаем метку с глобальной прозрачностью
-                            const icon = this.createMarkerIcon(markerType, markerColor, this.globalMarkerOpacity);
+                            const icon = this.createMarkerIcon(markerType, markerColor, 1.0);
 
-                            const markerObj = L.marker(leafletLatLng, { icon: icon })
-                                .addTo(this.map)
-                                .bindPopup(`
-                                    <div class="marker-popup">
-                                        <strong>${markerName || 'Без названия'}</strong><br>
-                                        Тип: ${this.getMarkerTypeName(markerType)}<br>
-                                        Координаты: X:${gameCoords.x} Y:${gameCoords.y} Z:${z}
-                                    </div>
-                                `);
+                            const markerObj = L.marker(leafletLatLng, { icon: icon });
+
+                            markerObj.bindPopup(`
+                                <div class="marker-popup">
+                                    <strong>${markerName || 'Без названия'}</strong><br>
+                                    Тип: ${this.getMarkerTypeName(markerType)}<br>
+                                    Координаты: X:${gameCoords.x} Y:${gameCoords.y} Z:${z}
+                                </div>
+                            `);
 
                             // Создаем текстовую метку только если есть название
                             let textLabel = null;
                             if (markerName) {
                                 textLabel = L.marker(leafletLatLng, {
-                                    icon: this.createTextLabel(markerName, markerColor, this.globalMarkerOpacity),
+                                    icon: this.createTextLabel(markerName, markerColor, 1.0),
                                     interactive: false
-                                }).addTo(this.map);
+                                });
+                            }
+
+                            // Добавляем метки на карту только если они видимы
+                            if (this.markersVisible) {
+                                markerObj.addTo(this.map);
+                                if (textLabel) {
+                                    textLabel.addTo(this.map);
+                                }
                             }
 
                             // Сохраняем ВСЕ оригинальные параметры из файла КАК ЕСТЬ
@@ -2642,19 +2930,30 @@ class DayZMap {
         event.target.value = '';
     }
 
-    // Функция обновления прозрачности всех меток
-    updateAllMarkersOpacity() {
+    // Функция переключения видимости всех меток
+    toggleAllMarkersVisibility() {
+        this.markersVisible = !this.markersVisible;
+        
+        const toggleBtn = document.getElementById('toggleMarkersBtn');
+        if (toggleBtn) {
+            toggleBtn.textContent = this.markersVisible ? 'Скрыть все метки' : 'Показать все метки';
+        }
+        
         // Используем requestAnimationFrame для лучшей производительности
         requestAnimationFrame(() => {
             this.markers.forEach(markerData => {
-                // Обновляем основную иконку метки
-                const newIcon = this.createMarkerIcon(markerData.type, markerData.color, this.globalMarkerOpacity);
-                markerData.marker.setIcon(newIcon);
-        
-                // Обновляем текстовую метку
-                if (markerData.textLabel) {
-                    const newTextLabel = this.createTextLabel(markerData.text, markerData.color, this.globalMarkerOpacity);
-                    markerData.textLabel.setIcon(newTextLabel);
+                if (this.markersVisible) {
+                    // Показываем метки
+                    markerData.marker.addTo(this.map);
+                    if (markerData.textLabel) {
+                        markerData.textLabel.addTo(this.map);
+                    }
+                } else {
+                    // Скрываем метки
+                    markerData.marker.remove();
+                    if (markerData.textLabel) {
+                        markerData.textLabel.remove();
+                    }
                 }
             });
         });
@@ -2664,14 +2963,7 @@ class DayZMap {
 	searchMarkers(searchTerm) {
 		this.searchFilter = searchTerm.trim();
 		const searchType = document.getElementById('searchType').value;
-		
-		console.log('=== НАЧАЛО ПОИСКА ===');
-		console.log('Поисковый запрос:', this.searchFilter);
-		console.log('Тип поиска из селекта:', searchType);
-		
-		// Парсим сложный запрос
 		const parsedQuery = this.parseComplexSearch(this.searchFilter);
-		console.log('Распарсенный запрос:', parsedQuery);
 		
 		this.filteredMarkers = this.markers.filter(marker => {
 			// Проверка по типу из выпадающего списка (имеет высший приоритет)
@@ -2690,14 +2982,13 @@ class DayZMap {
 			return this.checkComplexQuery(marker, parsedQuery);
 		});
 
-		console.log('=== РЕЗУЛЬТАТЫ ПОИСКА ===');
-		console.log('Найдено меток:', this.filteredMarkers.length);
-		console.log('Фильтрованные метки:', this.filteredMarkers.map(m => ({
-			name: m.text,
-			type: m.type
-		})));
-
 		this.isFilterActive = this.searchFilter || searchType;
+		
+		// Сохраняем в историю поиска, только если есть поисковый запрос или тип
+		if (this.searchFilter || searchType) {
+			this.addToSearchHistory(this.searchFilter, searchType);
+		}
+		
 		this.updateMarkersList();
 		this.showSearchResults();
 		this.updateSearchButtons();
@@ -2837,6 +3128,289 @@ class DayZMap {
         });
 
         this.showSuccess(`Показано ${this.filteredMarkers.length} меток`);
+    }
+
+    // Метод для показа модального окна массового редактирования
+    showBulkEditModal() {
+        if (!this.isFilterActive || this.filteredMarkers.length === 0) {
+            this.showError('Сначала выполните поиск меток');
+            return;
+        }
+
+        const content = `
+            <div class="bulk-edit-info">
+                <p><strong>Найдено меток:</strong> ${this.filteredMarkers.length}</p>
+                <p>Выберите действие для массового редактирования:</p>
+            </div>
+            
+            <div class="bulk-edit-actions">
+                <div class="bulk-edit-section">
+                    <h4>Изменить тип метки</h4>
+                    <select id="bulkEditType" class="bulk-select">
+                        <option value="">Не изменять</option>
+                        ${this.getMarkerTypeOptions('')}
+                    </select>
+                    <button id="applyBulkType" class="bulk-action-btn">Применить тип</button>
+                </div>
+                
+                <div class="bulk-edit-section">
+                    <h4>Изменить цвет</h4>
+                    <div class="color-palette-container">
+                        <div id="bulkColorPalette"></div>
+                        <div class="color-rgb-inputs">
+                            <div class="color-rgb-row">
+                                <span>R:</span>
+                                <input type="number" id="bulkColorR" min="0" max="255" value="52">
+                            </div>
+                            <div class="color-rgb-row">
+                                <span>G:</span>
+                                <input type="number" id="bulkColorG" min="0" max="255" value="152">
+                            </div>
+                            <div class="color-rgb-row">
+                                <span>B:</span>
+                                <input type="number" id="bulkColorB" min="0" max="255" value="219">
+                            </div>
+                        </div>
+                        <div class="color-preview" id="bulkColorPreview" style="background: rgb(52, 152, 219);"></div>
+                    </div>
+                    <button id="applyBulkColor" class="bulk-action-btn">Применить цвет</button>
+                </div>
+                
+                <div class="bulk-edit-section">
+                    <h4>Изменить название</h4>
+                    <input type="text" id="bulkPrefix" placeholder="Префикс (добавить в начало)" class="bulk-input">
+                    <input type="text" id="bulkSuffix" placeholder="Суффикс (добавить в конец)" class="bulk-input">
+                    <button id="applyBulkText" class="bulk-action-btn">Применить текст</button>
+                    <div style="margin-top: 10px;">
+                        <input type="text" id="bulkRemovePrefix" placeholder="Удалить префикс (если есть)" class="bulk-input">
+                        <input type="text" id="bulkRemoveSuffix" placeholder="Удалить суффикс (если есть)" class="bulk-input">
+                        <button id="applyBulkRemoveText" class="bulk-action-btn">Удалить текст</button>
+                    </div>
+                </div>
+                
+                <div class="bulk-edit-section">
+                    <h4>Переименовать все метки</h4>
+                    <input type="text" id="bulkRename" placeholder="Новое название для всех меток" class="bulk-input">
+                    <button id="applyBulkRename" class="bulk-action-btn">Переименовать все метки</button>
+                </div>
+                
+                <div class="bulk-edit-section danger">
+                    <h4>Опасные действия</h4>
+                    <button id="bulkDelete" class="bulk-action-btn danger">Удалить все найденные метки</button>
+                </div>
+            </div>
+            
+            <div class="modal-buttons">
+                <button id="closeBulkEdit" style="background: #7f8c8d; color: white;">Закрыть</button>
+            </div>
+        `;
+
+        const modal = this.createDraggableModal(`Массовое редактирование (${this.filteredMarkers.length} меток)`, content);
+
+        // Создаем цветовую палитру
+        this.createColorPalette('bulkColorPalette', 'bulkColorR', 'bulkColorG', 'bulkColorB', 'bulkColorPreview');
+
+        // Обновление превью цвета
+        const updateColorPreview = () => {
+            const r = document.getElementById('bulkColorR').value;
+            const g = document.getElementById('bulkColorG').value;
+            const b = document.getElementById('bulkColorB').value;
+            const color = `rgb(${r}, ${g}, ${b})`;
+            document.getElementById('bulkColorPreview').style.background = color;
+        };
+
+        document.getElementById('bulkColorR').addEventListener('input', updateColorPreview);
+        document.getElementById('bulkColorG').addEventListener('input', updateColorPreview);
+        document.getElementById('bulkColorB').addEventListener('input', updateColorPreview);
+
+        // Обработчики действий
+        document.getElementById('applyBulkType').addEventListener('click', () => {
+            const newType = document.getElementById('bulkEditType').value;
+            if (newType) {
+                this.bulkEditType(newType);
+            } else {
+                this.showError('Выберите тип метки');
+            }
+        });
+
+        document.getElementById('applyBulkColor').addEventListener('click', () => {
+            const r = document.getElementById('bulkColorR').value;
+            const g = document.getElementById('bulkColorG').value;
+            const b = document.getElementById('bulkColorB').value;
+            const newColor = `rgb(${r}, ${g}, ${b})`;
+            this.bulkEditColor(newColor);
+        });
+
+        document.getElementById('applyBulkText').addEventListener('click', () => {
+            const prefix = document.getElementById('bulkPrefix').value.trim();
+            const suffix = document.getElementById('bulkSuffix').value.trim();
+            if (prefix || suffix) {
+                this.bulkEditText(prefix, suffix);
+            } else {
+                this.showError('Введите префикс или суффикс');
+            }
+        });
+
+        document.getElementById('applyBulkRemoveText').addEventListener('click', () => {
+            const removePrefix = document.getElementById('bulkRemovePrefix').value.trim();
+            const removeSuffix = document.getElementById('bulkRemoveSuffix').value.trim();
+            if (removePrefix || removeSuffix) {
+                this.bulkRemoveText(removePrefix, removeSuffix);
+            } else {
+                this.showError('Введите префикс или суффикс для удаления');
+            }
+        });
+
+        document.getElementById('applyBulkRename').addEventListener('click', () => {
+            const newName = document.getElementById('bulkRename').value.trim();
+            if (newName) {
+                if (confirm(`Вы уверены, что хотите переименовать ${this.filteredMarkers.length} меток на "${newName}"? Это действие заменит все текущие названия.`)) {
+                    this.bulkRename(newName);
+                }
+            } else {
+                this.showError('Введите новое название');
+            }
+        });
+
+        document.getElementById('bulkDelete').addEventListener('click', () => {
+            if (confirm(`Вы уверены, что хотите удалить ${this.filteredMarkers.length} найденных меток? Это действие нельзя отменить.`)) {
+                this.bulkDelete();
+            }
+        });
+
+        document.getElementById('closeBulkEdit').addEventListener('click', () => {
+            this.closeModal(modal);
+        });
+    }
+
+    // Методы для массового редактирования
+    bulkEditType(newType) {
+        const typeName = this.getMarkerTypeName(newType);
+        this.filteredMarkers.forEach(markerData => {
+            markerData.type = newType;
+            // Обновляем иконку метки
+            const icon = this.createMarkerIcon(newType, markerData.color);
+            markerData.marker.setIcon(icon);
+        });
+        
+        this.updateMarkersList();
+        this.saveMarkers();
+        this.showSuccess(`Тип изменен на "${typeName}" для ${this.filteredMarkers.length} меток`);
+    }
+
+    bulkEditColor(newColor) {
+        this.filteredMarkers.forEach(markerData => {
+            markerData.color = newColor;
+            // Обновляем иконку метки
+            const icon = this.createMarkerIcon(markerData.type, newColor);
+            markerData.marker.setIcon(icon);
+            
+            // Обновляем цвет текстовой метки
+            if (markerData.textLabel) {
+                const newTextLabel = this.createTextLabel(markerData.text, newColor, 1.0);
+                markerData.textLabel.setIcon(newTextLabel);
+            }
+        });
+        
+        this.updateMarkersList();
+        this.saveMarkers();
+        this.showSuccess(`Цвет изменен для ${this.filteredMarkers.length} меток`);
+    }
+
+    bulkEditText(prefix, suffix) {
+        this.filteredMarkers.forEach(markerData => {
+            const oldText = markerData.text;
+            markerData.text = prefix + oldText + suffix;
+            // Обновляем текст на карте
+            if (markerData.textLabel) {
+                const newTextLabel = this.createTextLabel(markerData.text, markerData.color, 1.0);
+                markerData.textLabel.setIcon(newTextLabel);
+            }
+            markerData.marker.setTooltipContent(markerData.text);
+        });
+        
+        this.updateMarkersList();
+        this.saveMarkers();
+        this.showSuccess(`Название изменено для ${this.filteredMarkers.length} меток`);
+    }
+
+    bulkRemoveText(removePrefix, removeSuffix) {
+        let updatedCount = 0;
+        this.filteredMarkers.forEach(markerData => {
+            let newText = markerData.text;
+            let changed = false;
+            
+            // Удаляем префикс если он есть
+            if (removePrefix && newText.startsWith(removePrefix)) {
+                newText = newText.substring(removePrefix.length);
+                changed = true;
+            }
+            
+            // Удаляем суффикс если он есть
+            if (removeSuffix && newText.endsWith(removeSuffix)) {
+                newText = newText.substring(0, newText.length - removeSuffix.length);
+                changed = true;
+            }
+            
+            if (changed) {
+                markerData.text = newText;
+                // Обновляем текст на карте
+                if (markerData.textLabel) {
+                    const newTextLabel = this.createTextLabel(markerData.text, markerData.color, 1.0);
+                    markerData.textLabel.setIcon(newTextLabel);
+                }
+                markerData.marker.setTooltipContent(markerData.text);
+                updatedCount++;
+            }
+        });
+        
+        this.updateMarkersList();
+        this.saveMarkers();
+        
+        if (updatedCount > 0) {
+            this.showSuccess(`Удален префикс/суффикс для ${updatedCount} меток`);
+        } else {
+            this.showError('Ни у одной метки не найден указанный префикс или суффикс');
+        }
+    }
+
+    bulkRename(newName) {
+        this.filteredMarkers.forEach(markerData => {
+            markerData.text = newName;
+            
+            // Обновляем текст на карте
+            if (markerData.textLabel) {
+                const newTextLabel = this.createTextLabel(markerData.text, markerData.color, 1.0);
+                markerData.textLabel.setIcon(newTextLabel);
+            }
+            markerData.marker.setTooltipContent(markerData.text);
+        });
+        
+        this.updateMarkersList();
+        this.saveMarkers();
+        this.showSuccess(`Название изменено на "${newName}" для ${this.filteredMarkers.length} меток`);
+    }
+
+    bulkDelete() {
+        const count = this.filteredMarkers.length;
+        
+        // Удаляем метки с карты
+        this.filteredMarkers.forEach(markerData => {
+            this.map.removeLayer(markerData.marker);
+            if (markerData.textLabel) {
+                this.map.removeLayer(markerData.textLabel);
+            }
+        });
+        
+        // Удаляем из общего массива
+        this.markers = this.markers.filter(m => !this.filteredMarkers.some(fm => fm.id === m.id));
+        
+        // Очищаем фильтр
+        this.clearSearch();
+        
+        this.updateMarkersList();
+        this.saveMarkers();
+        this.showSuccess(`Удалено ${count} меток`);
     }
 
     // Метод для экспорта меток
@@ -3703,6 +4277,18 @@ class DayZMap {
 			});
 		});
 
+		// Инициализация обработчика для первой (статической) строки сервера
+		const firstRow = serversList.querySelector('.server-input-row');
+		if (firstRow) {
+			const firstRemoveBtn = firstRow.querySelector('.remove-server-btn');
+			if (firstRemoveBtn) {
+				firstRemoveBtn.addEventListener('click', () => {
+					firstRow.remove();
+					updateServersCount();
+				});
+			}
+		}
+
 		// Обработчик экспорта
 		modal.querySelector('#performServerExport').addEventListener('click', () => {
 			const servers = this.getServersFromForm(modal);
@@ -3877,6 +4463,10 @@ class DayZMap {
 		
 		const foundMarkers = this.findNearbyMarkers(centerX, centerY, radius);
 		
+		// Сохраняем найденные метки для использования в обработчиках
+		this.nearbyMarkers = foundMarkers;
+		console.log('Сохранено nearbyMarkers:', this.nearbyMarkers.length, 'меток');
+		
 		console.log('Найдено ближайших меток:', foundMarkers.length);
 		
 		// Гарантируем, что временный маркер отображается
@@ -3966,7 +4556,8 @@ class DayZMap {
 		setTimeout(() => {
 			try {
 				this.initializeRadiusControls(modal, centerX, centerY);
-				this.attachNearbyMarkersEventHandlers(modal);
+				// Передаем nearbyMarkers напрямую в обработчик
+				this.attachNearbyMarkersEventHandlers(modal, this.nearbyMarkers);
 				this.attachNearbyModalCloseHandlers(modal);
 			} catch (error) {
 				console.error('Error initializing nearby markers modal:', error);
@@ -4121,6 +4712,7 @@ class DayZMap {
 		this.removeTemporaryAddMarker(); // Удаляем временный маркер только при полной отмене
 		this.originalMarkerParams = null;
 		this.currentMarkerPosition = null;
+		console.log('Очищаем nearbyMarkers в returnToAddMarkerModalFromNearby');
 		this.nearbyMarkers = [];
 	}
 	
@@ -4176,14 +4768,22 @@ class DayZMap {
 			`;
 		}).join('');
 		
+		// Обновляем nearbyMarkers чтобы соответствовать новому списку
+		this.nearbyMarkers = markers;
+		
 		// Обновляем счетчик найденных меток
 		markersCount.textContent = markers.length;
 	}
 
 
 	// Метод для прикрепления обработчиков событий к элементам списка
-	attachNearbyMarkersEventHandlers(modal = null) {
+	attachNearbyMarkersEventHandlers(modal = null, nearbyMarkers = null) {
 		console.log('=== attachNearbyMarkersEventHandlers called ===');
+		console.log('nearbyMarkers param:', nearbyMarkers);
+		
+		// Используем переданный массив или this.nearbyMarkers
+		const markersArray = nearbyMarkers || this.nearbyMarkers;
+		console.log('Using markersArray:', markersArray);
 		
 		// Используем делегирование событий для динамических элементов
 		const markersList = document.getElementById('nearbyMarkersList');
@@ -4206,11 +4806,33 @@ class DayZMap {
 				e.stopPropagation();
 				this.editNearbyMarkerById(markerId, modal);
 			} else if (markerItem && !e.target.closest('button')) {
-				const editBtn = markerItem.querySelector('.edit-nearby-btn');
-				if (editBtn) {
-					const markerId = editBtn.dataset.markerId;
-					console.log('Marker item clicked, markerId:', markerId);
-					this.editNearbyMarkerById(markerId, modal);
+				// При клике на метку в списке - только выделяем её на карте
+				console.log('Marker item clicked, dataset:', markerItem.dataset);
+				const index = parseInt(markerItem.dataset.index);
+				
+				// Получаем актуальный массив nearbyMarkers
+				const currentMarkersArray = this.nearbyMarkers || [];
+				console.log('Parsed index:', index, 'currentMarkersArray:', currentMarkersArray);
+				
+				if (!isNaN(index) && currentMarkersArray && currentMarkersArray[index]) {
+					const markerData = currentMarkersArray[index];
+					console.log('Found markerData:', markerData);
+					
+					// Находим полную метку в основном массиве
+					const fullMarkerData = this.markers.find(m => m.id.toString() === markerData.id.toString());
+					console.log('Found fullMarkerData:', fullMarkerData);
+					
+					if (fullMarkerData) {
+						// Сначала выделяем маркер, потом открываем попап
+						console.log('Setting view to:', fullMarkerData.leafletLatLng);
+						this.map.setView(fullMarkerData.leafletLatLng, 8);
+						this.highlightMarker(fullMarkerData);
+						fullMarkerData.marker.openPopup();
+					} else {
+						console.error('Full marker data not found for ID:', markerData.id);
+					}
+				} else {
+					console.error('Invalid index or no currentMarkersArray:', index, currentMarkersArray);
 				}
 			}
 		});
@@ -4229,9 +4851,11 @@ class DayZMap {
 
 		// Сохраняем исходные найденные метки
 		const originalNearbyMarkers = [...this.nearbyMarkers];
+		console.log('initializeRadiusControls: originalNearbyMarkers:', originalNearbyMarkers.length);
 		
 		// Обновление значения радиуса в реальном времени
 		radiusSlider.addEventListener('input', () => {
+			console.log('Radius slider input event triggered');
 			const newRadius = parseInt(radiusSlider.value);
 			radiusValue.textContent = newRadius;
 			
@@ -4241,6 +4865,7 @@ class DayZMap {
 			
 			// Обновляем список меток в реальном времени
 			const updatedMarkers = this.findNearbyMarkers(centerX, centerY, newRadius);
+			console.log('updateNearbyMarkersList called from slider input, markers:', updatedMarkers.length);
 			this.updateNearbyMarkersList(updatedMarkers, centerX, centerY);
 		});
 		
@@ -4561,6 +5186,7 @@ class DayZMap {
 	
 	// Очистка данных поиска ближайших меток без удаления временного маркера
 	cleanupNearbySearchButKeepMarker() {
+		console.log('Очищаем nearbyMarkers в cleanupNearbySearchButKeepMarker');
 		this.removeSearchCircle();
 		// НЕ удаляем временный маркер: this.removeTemporaryAddMarker();
 		this.originalMarkerParams = null;
@@ -4835,8 +5461,6 @@ class DayZMap {
 		}
 	}
 
-
-	
 }
 
 document.addEventListener('DOMContentLoaded', () => {
