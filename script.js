@@ -144,6 +144,7 @@ class DayZMap {
 		this.temporaryAddMarker = null; // Временный маркер при добавлении
 		this.searchHistory = []; // История поиска
 		this.maxSearchHistory = 10; // Максимальное количество элементов в истории
+		this.currentTheme = 'dark'; // Текущая тема: 'dark', 'light', 'winter'
         this.init();
     }
 
@@ -211,6 +212,7 @@ class DayZMap {
     init() {
         console.log('Инициализация карты...');
         this.loadSearchHistory(); // Загружаем историю поиска
+        this.loadTheme(); // Загружаем тему
         this.initMap();
         this.bindEvents();
     }
@@ -1086,7 +1088,15 @@ class DayZMap {
 					this.showCoordsHelp2(); // Будет другой текст подсказки
 				});
 			}
-		
+
+			// Обработчик для селектора темы
+			const themeSelector = document.getElementById('themeSelector');
+			if (themeSelector) {
+				themeSelector.addEventListener('change', (e) => {
+					this.setTheme(e.target.value);
+				});
+			}
+
         } catch (error) {
             console.error('Ошибка при привязке событий:', error);
         }
@@ -2600,6 +2610,67 @@ class DayZMap {
 			console.error('Ошибка загрузки истории поиска:', e);
 			this.searchHistory = [];
 			this.updateSearchHistoryUI();
+		}
+	}
+
+	// Методы для работы с темами
+	loadTheme() {
+		try {
+			const savedTheme = localStorage.getItem('dayzMapTheme');
+			if (savedTheme && (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'winter')) {
+				this.currentTheme = savedTheme;
+			}
+			// Применяем тему
+			this.applyTheme();
+			this.updateThemeSelector();
+		} catch (e) {
+			console.error('Ошибка загрузки темы:', e);
+			this.currentTheme = 'dark'; // Значение по умолчанию
+			this.applyTheme();
+			this.updateThemeSelector();
+		}
+	}
+
+	saveTheme(theme) {
+		try {
+			localStorage.setItem('dayzMapTheme', theme);
+		} catch (e) {
+			console.error('Ошибка сохранения темы:', e);
+		}
+	}
+
+	setTheme(theme) {
+		if (['dark', 'light', 'winter'].includes(theme)) {
+			this.currentTheme = theme;
+			this.applyTheme();
+			this.saveTheme(this.currentTheme);
+			this.updateThemeSelector();
+		}
+	}
+
+	toggleTheme() {
+		// Старый метод для совместимости, переключает между темами по кругу
+		const themes = ['dark', 'light', 'winter'];
+		const currentIndex = themes.indexOf(this.currentTheme);
+		const nextIndex = (currentIndex + 1) % themes.length;
+		this.setTheme(themes[nextIndex]);
+	}
+
+	applyTheme() {
+		const body = document.body;
+		if (this.currentTheme === 'light') {
+			body.setAttribute('data-theme', 'light');
+		} else if (this.currentTheme === 'winter') {
+			body.setAttribute('data-theme', 'winter');
+		} else {
+			body.removeAttribute('data-theme');
+		}
+	}
+
+	updateThemeSelector() {
+		const selector = document.getElementById('themeSelector');
+		if (selector) {
+			selector.value = this.currentTheme;
 		}
 	}
 
