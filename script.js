@@ -1,9 +1,9 @@
 // Конфигурация карты
 const CONFIG = {
     tileSize: 480,
-    minZoom: 5,
+    minZoom: 2,
     maxZoom: 12,
-    initialZoom: 5,
+    initialZoom: 4,
     maxTilesX: 31,
     maxTilesY: 31,
     mapPixelWidth: 15360,
@@ -11,37 +11,53 @@ const CONFIG = {
 
     // Конфигурация для разных уровней тайлов
     tileSets: {
-        high: {
-            folder: 'tiles_high',
-            prefix: 'S',
-            format: 3,
-            gridSize: 32,
+        z8: {
+            folder: 'tiles_z8',
+            gridSize: 256,
             zoomLevels: [11, 11.5, 12],
             scale: 1
         },
-        medium: {
-            folder: 'tiles_medium',
-            prefix: 'L',
-            format: 2,
-            gridSize: 16,
-            zoomLevels: [9, 9.5, 10, 10.5],
+        z7: {
+            folder: 'tiles_z7',
+            gridSize: 128,
+            zoomLevels: [10, 10.5],
             scale: 2
         },
-        low: {
-            folder: 'tiles_low',
-            prefix: 'L',
-            format: 2,
-            gridSize: 8,
-            zoomLevels: [7, 7.5, 8, 8.5],
+        z6: {
+            folder: 'tiles_z6',
+            gridSize: 64,
+            zoomLevels: [9, 9.5],
             scale: 4
         },
-        minimal: {
-            folder: 'tiles_minimal',
-            prefix: 'L',
-            format: 2,
-            gridSize: 8,
-            zoomLevels: [5, 5.5, 6, 6.5],
+        z5: {
+            folder: 'tiles_z5',
+            gridSize: 32,
+            zoomLevels: [8, 8.5],
             scale: 8
+        },
+        z4: {
+            folder: 'tiles_z4',
+            gridSize: 16,
+            zoomLevels: [7, 7.5],
+            scale: 16
+        },
+        z3: {
+            folder: 'tiles_z3',
+            gridSize: 8,
+            zoomLevels: [6, 6.5],
+            scale: 32
+        },
+        z2: {
+            folder: 'tiles_z2',
+            gridSize: 4,
+            zoomLevels: [5, 5.5],
+            scale: 64
+        },
+        z1: {
+            folder: 'tiles_z1',
+            gridSize: 2,
+            zoomLevels: [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5],
+            scale: 128
         }
     },
 
@@ -116,7 +132,7 @@ class DayZMap {
             color: '#3498db'
         };
         this.modalCloseHandlers = new Map(); // Для управления обработчиками модальных окон
-		this.lastTileSet = 'minimal';
+		this.lastTileSet = 'z1';
 		this.loadedTiles = new Set(); // отслеживаем загруженные тайлы
 		this.lastLoadBounds = null; // последняя загруженная область
 		this.loadThrottle = null; // для троттлинга
@@ -145,6 +161,9 @@ class DayZMap {
 		this.searchHistory = []; // История поиска
 		this.maxSearchHistory = 10; // Максимальное количество элементов в истории
 		this.currentTheme = 'dark'; // Текущая тема: 'dark', 'light', 'winter'
+		this.namesData = []; // Данные названий из names.js
+		this.nameLabels = new Map(); // Карта для хранения меток названий
+		this.namesVisible = true; // Состояние видимости названий
         this.init();
     }
 
@@ -230,8 +249,8 @@ class DayZMap {
 			crs: L.CRS.Simple,
 			minZoom: CONFIG.minZoom,
 			maxZoom: CONFIG.maxZoom,
-			zoomSnap: 0.5,
-			zoomDelta: 0.5,
+			zoomSnap: 1,
+			zoomDelta: 1,
 			wheelPxPerZoomLevel: 100,
 			attributionControl: false
 		});
@@ -253,6 +272,129 @@ class DayZMap {
 		// Загружаем маркеры и сетку независимо от тайлов
 		this.loadMarkers();
 		this.addGrid();
+		this.initNames();
+	}
+
+	// Инициализация данных названий из names_data.js
+	initNames() {
+		console.log('Инициализация данных названий...');
+
+		// Загружаем данные из names_data.js
+		if (typeof window.namesData !== 'undefined') {
+			this.namesData = window.namesData.map(item => ({
+				id: item.id,
+				name: item.name,
+				position: item.position,
+				type: item.type
+			}));
+			console.log(`Загружено ${this.namesData.length} названий из names_data.js`);
+		} else {
+			console.error('namesData не найден. Убедитесь, что файл names_data.js загружен корректно.');
+			this.namesData = [];
+		}
+
+		this.updateNamesVisibility();
+	}
+
+
+
+
+
+	// Получить порог зума для типа локации
+	getZoomThreshold(type) {
+		const thresholds = {
+			'Capital': 2,
+			'City': 3,
+			'Village': 4,
+			'Camp': 5,
+			'Local': 6,
+			'Hill': 6,
+			'Ruin': 7,
+			'Marine': 6
+		};
+		return thresholds[type] || 7; // По умолчанию показывать при среднем зуме
+	}
+
+	// Проверить, нужно ли показывать название при текущем зуме
+	shouldShowName(type, currentZoom) {
+		const threshold = this.getZoomThreshold(type);
+		return currentZoom >= threshold;
+	}
+
+	// Очистить все метки названий
+	clearAllNameLabels() {
+		this.nameLabels.forEach(label => {
+			this.map.removeLayer(label);
+		});
+		this.nameLabels.clear();
+	}
+
+	// Обновить видимость названий в зависимости от зума
+	updateNamesVisibility() {
+		if (!this.namesVisible) return;
+
+		const currentZoom = this.map.getZoom();
+		console.log('Обновление видимости названий, зум:', currentZoom);
+
+		// Очищаем все существующие метки названий
+		this.clearAllNameLabels();
+
+		// Добавляем только те, которые должны быть видимы при текущем зуме
+		this.namesData.forEach(nameData => {
+			const shouldShow = this.shouldShowName(nameData.type, currentZoom);
+
+			if (shouldShow) {
+				this.addNameLabel(nameData);
+			}
+		});
+	}
+
+	// Добавить метку названия на карту
+	addNameLabel(nameData) {
+		// Преобразовать координаты в Leaflet
+		const leafletLatLng = this.gameToLeafletCoords(nameData.position[0], nameData.position[1]);
+
+		// Создать метку названия
+		const nameLabel = L.marker(leafletLatLng, {
+			icon: L.divIcon({
+				className: 'name-label',
+				html: `<div class="name-text" data-type="${nameData.type}">${nameData.name}</div>`,
+				iconSize: [180, 20],
+				iconAnchor: [10, 10]
+			}),
+			interactive: false
+		});
+
+		nameLabel.addTo(this.map);
+		this.nameLabels.set(nameData.id, nameLabel);
+	}
+
+	// Удалить метку названия с карты
+	removeNameLabel(nameId) {
+		const label = this.nameLabels.get(nameId);
+		if (label) {
+			this.map.removeLayer(label);
+			this.nameLabels.delete(nameId);
+		}
+	}
+
+	// Переключить видимость всех названий
+	toggleNamesVisibility() {
+		this.namesVisible = !this.namesVisible;
+
+		const toggleBtn = document.getElementById('toggleNamesBtn');
+		if (toggleBtn) {
+			toggleBtn.textContent = this.namesVisible ? 'Скрыть города' : 'Показать города';
+		}
+
+		if (this.namesVisible) {
+			this.updateNamesVisibility();
+		} else {
+			// Скрыть все названия
+			this.clearAllNameLabels();
+		}
+
+		console.log('Города:', this.namesVisible ? 'показаны' : 'скрыты');
 	}
 
     formatTileNumber(num) {
@@ -263,11 +405,9 @@ class DayZMap {
         return Math.round(num / 100).toString().padStart(3, '0');
     }
 
-    getTileFileName(x, y, tileSet = 'high') {
+    getTileFileName(x, y, tileSet = 'z8') {
 		const config = CONFIG.tileSets[tileSet];
-		const formattedX = x.toString().padStart(config.format, '0');
-		const formattedY = y.toString().padStart(config.format, '0');
-		return `${config.prefix}_${formattedX}_${formattedY}_lco.webp`;
+		return `${x}/${y}.webp`;
 	}
 
     tileToLeafletBounds(tileX, tileY, tileSet = 'high') {
@@ -297,9 +437,14 @@ class DayZMap {
 			}
 		}
 		// Если зум выходит за пределы настроенных уровней, используем ближайший
-		if (zoom < 7) return 'low';
-		if (zoom < 10) return 'medium';
-		return 'high';
+		if (zoom >= 11) return 'z8';
+		if (zoom >= 10) return 'z7';
+		if (zoom >= 9) return 'z6';
+		if (zoom >= 8) return 'z5';
+		if (zoom >= 7) return 'z4';
+		if (zoom >= 6) return 'z3';
+		if (zoom >= 5) return 'z2';
+		return 'z1';
 	}
 	
     async loadTiles() {
@@ -423,7 +568,7 @@ class DayZMap {
             const fileName = this.getTileFileName(x, y, tileSet);
             const url = `${config.folder}/${fileName}`;
             const bounds = this.tileToLeafletBounds(x, y, tileSet);
-            
+
 			this.loadTileDirectly(url, bounds, fileName, generation, resolve, reject);
         });
     }
@@ -500,14 +645,14 @@ class DayZMap {
 
     // Получить набор тайлов более низкого разрешения
     getLowerResolutionSet(currentSet) {
-        const sets = ['high', 'medium', 'low', 'minimal'];
+        const sets = ['z8', 'z7', 'z6', 'z5', 'z4', 'z3', 'z2', 'z1'];
         const currentIndex = sets.indexOf(currentSet);
         return currentIndex < sets.length - 1 ? sets[currentIndex + 1] : null;
     }
 
     // Проверить, нужно ли использовать прогрессивную загрузку
     shouldUseProgressive(tileSet) {
-        return ['high'].includes(tileSet);
+        return ['z8'].includes(tileSet);
     }
 	
 	//выгрузка невидимых тайлов с оптимизацией памяти
@@ -575,106 +720,6 @@ class DayZMap {
 				this.map.removeLayer(layer);
 			}
 		});
-	}
-	
-	showLoadingIndicator(message) {
-		// Удаляем старый индикатор если есть
-		this.hideLoadingIndicator();
-		
-		const loadingDiv = document.createElement('div');
-		loadingDiv.id = 'tileLoadingIndicator';
-		loadingDiv.style.cssText = `
-			position: absolute;
-			top: 50%;
-			left: 50%;
-			transform: translate(-50%, -50%);
-			background: rgba(0,0,0,0.9);
-			color: white;
-			padding: 20px;
-			border-radius: 8px;
-			z-index: 10001;
-			text-align: center;
-			border: 2px solid #3498db;
-			min-width: 300px;
-		`;
-		
-		loadingDiv.innerHTML = `
-			<div style="margin-bottom: 10px;">
-				<div style="font-size: 16px; font-weight: bold; margin-bottom: 5px;">${message}</div>
-				<div id="tileLoadingProgress" style="font-size: 12px; color: #bdc3c7;">Загрузка...</div>
-			</div>
-			<div style="width: 100%; height: 4px; background: #34495e; border-radius: 2px; overflow: hidden;">
-				<div id="tileLoadingBar" style="width: 0%; height: 100%; background: #3498db; transition: width 0.3s;"></div>
-			</div>
-		`;
-		
-		document.getElementById('map').appendChild(loadingDiv);
-		this.loadingIndicator = loadingDiv;
-	}
-
-	updateLoadingProgress(loaded, totalTiles, tileSet) {
-		const percent = Math.round((loaded / totalTiles) * 100);
-		
-		const progressElement = document.getElementById('tileLoadingProgress');
-		const barElement = document.getElementById('tileLoadingBar');
-		
-		if (progressElement && barElement) {
-			progressElement.textContent = `${loaded}/${totalTiles} тайлов (${percent}%) - ${tileSet}`;
-			barElement.style.width = `${percent}%`;
-		}
-	}
-
-	hideLoadingIndicator() {
-		if (this.loadingIndicator && this.loadingIndicator.parentNode) {
-			this.loadingIndicator.parentNode.removeChild(this.loadingIndicator);
-		}
-	}
-
-    loadTileImage(url, bounds, x, y, tileSet = 'high') {
-		return new Promise((resolve, reject) => {
-			const testImg = new Image();
-			let timeoutId;
-			
-			testImg.onload = () => {
-				clearTimeout(timeoutId);
-				try {
-					L.imageOverlay(url, bounds).addTo(this.map);
-					resolve();
-				} catch (error) {
-					reject(error);
-				}
-			};
-			
-			testImg.onerror = () => {
-				clearTimeout(timeoutId);
-				reject(new Error('Файл не найден или ошибка загрузки'));
-			};
-			
-			testImg.src = url;
-			
-			timeoutId = setTimeout(() => {
-				if (!testImg.complete) {
-					reject(new Error('Таймаут загрузки'));
-				}
-			}, 15000); // Увеличиваем таймаут до 15 секунд
-		});
-	}
-
-    processTileLoadResults(results, tileSet) {
-		const loaded = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
-		const errors = results.length - loaded;
-		
-		console.log(`=== ИТОГ ЗАГРУЗКИ (${tileSet}): ${loaded} успешно, ${errors} ошибок ===`);
-		
-		if (loaded === 0) {
-			this.showError(`Не загружено ни одного тайла в наборе ${tileSet}!`);
-		} else {
-			if (errors > 0) {
-				console.warn(`Загружено ${loaded} тайлов (${tileSet}), ${errors} ошибок`);
-			} else {
-				console.log(`Все ${loaded} тайлов (${tileSet}) успешно загружены!`);
-			}
-		}
 	}
 
     leafletToGameCoords(leafletLatLng) {
@@ -990,6 +1035,14 @@ class DayZMap {
                     this.toggleAllMarkersVisibility();
                 });
             }
+
+            // Обработчик кнопки показа/скрытия названий
+            const toggleNamesBtn = document.getElementById('toggleNamesBtn');
+            if (toggleNamesBtn) {
+                toggleNamesBtn.addEventListener('click', () => {
+                    this.toggleNamesVisibility();
+                });
+            }
 			
 			// Обработчик для добавления метки по координатам
             const addMarkerByCoordsBtn = document.getElementById('addMarkerByCoords');
@@ -1027,32 +1080,35 @@ class DayZMap {
 			// Обработчик зума
 			this.map.on('zoomend', () => {
 				console.log('Zoom changed to:', this.map.getZoom());
-				
+
 				// 1. Обновляем сетку и оси (если сетка включена)
 				if (this.gridEnabled) {
 					this.updateGrid();
 					this.updateAxes();
 				}
-				
+
 				const newZoom = this.map.getZoom();
 				const currentTileSet = this.getCurrentTileSet(newZoom);
-				
+
 				// 2. Проверяем смену набора тайлов
 				if (this.lastTileSet !== currentTileSet) {
 					console.log(`Переключение с ${this.lastTileSet} на ${currentTileSet} тайлы`);
 					this.clearAllTiles();
 					this.lastTileSet = currentTileSet;
 				}
-				
+
 				// 3. Загружаем тайлы для новой области (если ленивая загрузка включена)
 				if (CONFIG.lazyLoading.enabled) {
 					this.loadTiles();
 				}
-				
+
 				// 4. Обновляем поиск если он активен (дополнительная логика если нужна)
 				if (this.isFilterActive) {
 					this.updateMarkersList();
 				}
+
+				// 5. Обновляем видимость названий
+				this.updateNamesVisibility();
 			});
 			
 			// Обработчик для сортировки меток
@@ -1102,16 +1158,6 @@ class DayZMap {
         }
     }
 	
-	//для просмотра статистики
-	getTileStats() {
-        return {
-            loaded: this.loadedTiles.size,
-            visible: this.currentTileLayers.size,
-            lastBounds: this.lastLoadBounds
-        };
-    }
-	// в консоли dayzMap.getTileStats() // посмотреть статистику загрузки
-	
 	clearAllTiles() {
         this.currentTileLayers.forEach(layer => {
             this.map.removeLayer(layer);
@@ -1120,37 +1166,6 @@ class DayZMap {
         this.loadedTiles.clear();
         this.currentTileLayers.clear();
         this.lastLoadBounds = null;
-    }
-	
-	async loadAllTiles() {
-        console.log('Полная загрузка всех тайлов...');
-        
-        const currentZoom = this.map.getZoom();
-        const tileSet = this.getCurrentTileSet(currentZoom);
-        const config = CONFIG.tileSets[tileSet];
-        
-        this.clearAllTiles();
-        
-        const promises = [];
-        for (let x = 0; x < config.gridSize; x++) {
-            for (let y = 0; y < config.gridSize; y++) {
-                const tileKey = `${tileSet}_${x}_${y}`;
-                const promise = this.loadSingleTile(x, y, tileSet)
-                    .then(layer => {
-                        this.loadedTiles.add(tileKey);
-                        this.currentTileLayers.set(tileKey, layer);
-                        return { success: true, tile: tileKey };
-                    })
-                    .catch(error => {
-                        return { success: false, tile: tileKey, error: error.message };
-                    });
-                promises.push(promise);
-            }
-        }
-        
-        const results = await Promise.allSettled(promises);
-        const loaded = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
-        console.log(`Полная загрузка завершена: ${loaded} тайлов`);
     }
 	
 	// Метод для преобразования игровых координат в Leaflet координаты
@@ -2509,7 +2524,7 @@ class DayZMap {
 					// Обновляем кнопку
 					const toggleBtn = document.getElementById('toggleMarkersBtn');
 					if (toggleBtn) {
-						toggleBtn.textContent = this.markersVisible ? 'Скрыть все метки' : 'Показать все метки';
+						toggleBtn.textContent = this.markersVisible ? 'Скрыть метки' : 'Показать метки';
 					}
 				}
 				
@@ -2710,6 +2725,15 @@ class DayZMap {
 		this.updateSearchHistoryUI();
 	}
 
+	removeSearchHistoryItem(timestamp) {
+		const index = this.searchHistory.findIndex(item => item.timestamp === parseInt(timestamp));
+		if (index !== -1) {
+			this.searchHistory.splice(index, 1);
+			this.saveSearchHistory();
+			this.updateSearchHistoryUI();
+		}
+	}
+
 	updateSearchHistoryUI() {
 		const list = document.getElementById('searchHistoryList');
 		const count = document.getElementById('searchHistoryCount');
@@ -2733,30 +2757,35 @@ class DayZMap {
 			return;
 		}
 		
-		// Показываем детали если есть история, но не открываем их автоматически
+		// Показываем детали если есть история
 		if (details) {
 			details.style.display = 'block';
-			// Убедимся что детали свернуты
-			details.open = false;
+			// Оставляем детали в текущем состоянии
 		}
 		
 		// Добавляем элементы для каждого записи в истории
 		this.searchHistory.forEach(item => {
 			const historyItem = document.createElement('div');
 			historyItem.className = 'search-history-item';
-			
+
 			const typeText = item.type ? this.getMarkerTypeName(item.type) : '';
 			const displayText = typeText ? `${item.term} (${typeText})` : item.term;
-			
+
 			historyItem.innerHTML = `
 				<span class="search-history-text">${this.escapeHtml(displayText)}</span>
+				<button class="search-history-delete" data-timestamp="${item.timestamp}" title="Удалить из истории">×</button>
 			`;
-			
+
 			// Добавляем обработчик клика
-			historyItem.addEventListener('click', () => {
-				this.applySearchFromHistory(item);
+			historyItem.addEventListener('click', (e) => {
+				if (e.target.classList.contains('search-history-delete')) {
+					e.stopPropagation(); // Предотвращаем клик по элементу
+					this.removeSearchHistoryItem(e.target.dataset.timestamp);
+				} else {
+					this.applySearchFromHistory(item);
+				}
 			});
-			
+
 			list.appendChild(historyItem);
 		});
 	}
@@ -2776,15 +2805,8 @@ class DayZMap {
 		// Выполняем поиск
 		this.searchMarkers(historyItem.term);
 		
-		// Закрываем детали после выбора
-		const details = document.getElementById('searchHistoryDetails');
-		if (details) {
-			details.open = false;
-		}
+		// Детали остаются открытыми после выбора
 	}
-
-	// Удаляем неиспользуемые методы
-	// showSearchHistory и hideSearchHistory больше не нужны
 
 	escapeHtml(text) {
 		const div = document.createElement('div');
@@ -3004,10 +3026,10 @@ class DayZMap {
     // Функция переключения видимости всех меток
     toggleAllMarkersVisibility() {
         this.markersVisible = !this.markersVisible;
-        
+
         const toggleBtn = document.getElementById('toggleMarkersBtn');
         if (toggleBtn) {
-            toggleBtn.textContent = this.markersVisible ? 'Скрыть все метки' : 'Показать все метки';
+            toggleBtn.textContent = this.markersVisible ? 'Скрыть метки' : 'Показать метки';
         }
         
         // Используем requestAnimationFrame для лучшей производительности
@@ -4241,14 +4263,10 @@ class DayZMap {
 						<details>
 							<summary><strong>Предустановленные серверы YW</strong></summary>
 							<div class="preset-servers" style="margin-top: 10px;">
-								<div class="preset-server" data-ip="109.248.4.32" data-port="2200">chernarus1 - 109.248.4.32:2200</div>
-								<div class="preset-server" data-ip="109.248.4.32" data-port="2206">chernarus2 - 109.248.4.32:2206</div>
-								<div class="preset-server" data-ip="109.248.4.32" data-port="2212">chernarus3 - 109.248.4.32:2212</div>
-								<div class="preset-server" data-ip="109.248.4.106" data-port="2200">chernarus4 - 109.248.4.106:2200</div>
-								<div class="preset-server" data-ip="109.248.4.106" data-port="2206">chernarus5 - 109.248.4.106:2206</div>
-								<div class="preset-server" data-ip="109.248.4.106" data-port="2212">chernarus6 - 109.248.4.106:2212</div>
-								<div class="preset-server" data-ip="109.248.4.32" data-port="2218">dungeon-1 - 109.248.4.32:2218</div>
-								<div class="preset-server" data-ip="109.248.4.106" data-port="2218">dungeon-2 - 109.248.4.106:2218</div>
+								<div class="preset-server" data-ip="109.248.4.32" data-port="2200">chernarus-1 --> 109.248.4.32:2200</div>
+								<div class="preset-server" data-ip="109.248.4.32" data-port="2206">chernarus-2 --> 109.248.4.32:2206</div>
+								<div class="preset-server" data-ip="109.248.4.106" data-port="2200">chernarus-3 --> 109.248.4.106:2200</div>
+								<div class="preset-server" data-ip="109.248.4.106" data-port="2206">chernarus-4 --> 109.248.4.106:2206</div>
 							</div>
 						</details>
 					</div>
@@ -4268,13 +4286,6 @@ class DayZMap {
 						<div class="servers-count">Добавлено серверов: <span id="serversCount">1</span>/20</div>
 					</div>
 				</div>
-			</div>
-			
-			<div class="modal-field">
-				<label>
-					<input type="checkbox" id="includeServerName" checked>
-					Включить название сервера в файл
-				</label>
 			</div>
 			
 			<div class="modal-buttons">
@@ -4369,8 +4380,7 @@ class DayZMap {
 				return;
 			}
 
-			const includeServerName = modal.querySelector('#includeServerName').checked;
-			this.performAdvancedServerExport(markersToExport, servers, includeServerName);
+			this.performAdvancedServerExport(markersToExport, servers);
 			this.closeModal(modal);
 		});
 
@@ -4404,7 +4414,7 @@ class DayZMap {
 	}
 	
 	// Улучшенный метод экспорта на серверы
-	performAdvancedServerExport(markersToExport, servers, includeServerName = true) {
+	performAdvancedServerExport(markersToExport, servers) {
 		// Получаем данные для экспорта
 		const markersData = this.prepareExportData(markersToExport);
 		
