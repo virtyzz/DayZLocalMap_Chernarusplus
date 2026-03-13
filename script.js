@@ -65,11 +65,12 @@ const CONFIG = {
     lazyLoading: {
         enabled: true,
         buffer: 3,
-        throttleDelay: 100,
-        maxConcurrentLoads: 8,
-        preloadBuffer: 4,
-        unloadDelay: 500,
-        memoryLimit: 100
+        throttleDelay: 20,
+        maxConcurrentLoads: 32,
+        preloadBuffer: 12,
+        unloadDelay: 300,
+        memoryLimit: 1000,
+        timeout: 4000
     }
 };
 
@@ -126,17 +127,34 @@ class DayZMap {
         this.searchFilter = '';
         this.filteredMarkers = [];
         this.isFilterActive = false;
+        this.sortedMarkers = null;
+        this.sortedFilteredMarkers = null;
+        this.isDragging = false; // Флаг для предотвращения конфликтов drag-and-drop с сортировкой
+        this.dragHandlerAdded = false; // Флаг, что обработчик drag уже добавлен
+        // Переменные для drag-and-drop
+        this.draggedElement = null;
+        this.draggedClone = null;
+        this.placeholder = null;
+        this.originalIndex = -1;
+        this.dragOffsetX = 0;
+        this.dragOffsetY = 0;
+        this.dragStarted = false;
+        this.startX = 0;
+        this.startY = 0;
+        this.lastInsertIndex = -1;
+        this.dragThreshold = 5;
         this.lastMarkerParams = {
             text: 'Метка',
             type: 'default',
             color: '#3498db'
         };
         this.modalCloseHandlers = new Map(); // Для управления обработчиками модальных окон
-		this.lastTileSet = 'z1';
+		this.lastTileSet = null; // будет установлен при первой загрузке
 		this.loadedTiles = new Set(); // отслеживаем загруженные тайлы
 		this.lastLoadBounds = null; // последняя загруженная область
 		this.loadThrottle = null; // для троттлинга
 		this.currentTileLayers = new Map(); // храним ссылки на загруженные тайлы
+		this.backgroundLayers = new Map(); // фоновые тайлы z3 (всегда загружены)
 		this.tileLoadGeneration = 0;
 		this.tileUnloadTimeout = null;
 		this.saveMarkersTimeout = null;
@@ -145,8 +163,8 @@ class DayZMap {
 		this.markersLoaded = false;
 		this.gridLoaded = false;
 		this.currentSort = {
-            field: 'name',
-            direction: 'asc'
+            field: null,
+            direction: null
         };
         this.sortDirection = 1;
 		this.temporaryMarker = null;
@@ -164,8 +182,269 @@ class DayZMap {
 		this.namesData = []; // Данные названий из names.js
 		this.nameLabels = new Map(); // Карта для хранения меток названий
 		this.namesVisible = true; // Состояние видимости названий
+		// Данные для построения маршрута
+		this.routeStartCoords = null;
+		this.routeStartLeafletLatLng = null;
+		this.routeCriteria = [{type: 'skull', name: ''}]; // Массив критериев для маршрута
+		// Менеджер профилей
+		this.profilesManager = null;
+		// Выделение области
+		this.areaSelectionMode = false;
+		this.areaSelectionPolygon = null;
+		this.areaSelectionPoints = [];
+		this.areaSelectionHint = null;
+		this._boundKeydownHandler = null;
+		this.areaSelectionActive = false; // флаг активной выделенной области
+		this.areaSelectionResultPolygon = null; // полигон результата выделения
         this.init();
     }
+	
+	// Создание контрола поиска города на карте
+	createCitySearchMapControl() {
+		const CitySearchMapControl = L.Control.extend({
+			options: {
+				position: 'topright'
+			},
+			
+			onAdd: (map) => {
+				const container = L.DomUtil.create('div', 'city-search-map-control');
+				
+				// Предотвращаем события карты на элементах контрола
+				L.DomEvent.disableClickPropagation(container);
+				L.DomEvent.disableScrollPropagation(container);
+				
+				// Создаем структуру контрола
+				container.innerHTML = `
+					<button class="city-search-toggle-btn" title="Поиск города">
+						<span class="search-icon">🔍</span>
+					</button>
+					<div class="city-search-map-panel" style="display: none;">
+						<div class="city-search-input-wrapper">
+							<input type="text" id="citySearchInputMap" placeholder="Поиск города..." autocomplete="off">
+							<button class="city-search-close-btn" title="Закрыть">×</button>
+						</div>
+						<div id="citySearchResultsMap" class="city-search-results"></div>
+					</div>
+				`;
+				
+				// Инициализируем функциональность контрола
+				this.initCitySearchMapControl(container);
+				
+				return container;
+			}
+		});
+		
+		this.citySearchMapControl = new CitySearchMapControl();
+		this.citySearchMapControl.addTo(this.map);
+	}
+	
+	// Инициализация функциональности контрола поиска города на карте
+	initCitySearchMapControl(container) {
+		const toggleBtn = container.querySelector('.city-search-toggle-btn');
+		const searchPanel = container.querySelector('.city-search-map-panel');
+		const searchInput = container.querySelector('#citySearchInputMap');
+		const searchResults = container.querySelector('#citySearchResultsMap');
+		const closeBtn = container.querySelector('.city-search-close-btn');
+		
+		// Переключение панели
+		toggleBtn.addEventListener('click', (e) => {
+			e.stopPropagation();
+			const isVisible = searchPanel.style.display === 'block';
+			
+			if (isVisible) {
+				searchPanel.style.display = 'none';
+				toggleBtn.classList.remove('active');
+			} else {
+				searchPanel.style.display = 'block';
+				toggleBtn.classList.add('active');
+				searchInput.focus();
+			}
+		});
+		
+		// Закрытие по крестику
+		closeBtn.addEventListener('click', (e) => {
+			e.stopPropagation();
+			searchPanel.style.display = 'none';
+			toggleBtn.classList.remove('active');
+		});
+		
+		// Закрытие при клике вне контрола
+		document.addEventListener('click', (e) => {
+			if (!container.contains(e.target)) {
+				searchPanel.style.display = 'none';
+				toggleBtn.classList.remove('active');
+			}
+		});
+		
+		// Перенаправляем события на оригинальные элементы для совместимости с существующей логикой
+		this.setupCitySearchMapRedirection(searchInput, searchResults);
+	}
+	
+	// Настройка перенаправления событий поиска с карты на основную логику
+	setupCitySearchMapRedirection(mapInput, mapResults) {
+		// Создаем невидимые оригинальные элементы если их нет
+		let originalInput = document.getElementById('citySearchInput');
+		let originalResults = document.getElementById('citySearchResults');
+		
+		if (!originalInput) {
+			originalInput = document.createElement('input');
+			originalInput.type = 'text';
+			originalInput.id = 'citySearchInput';
+			originalInput.style.display = 'none';
+			originalInput.autocomplete = 'off';
+			document.body.appendChild(originalInput);
+		}
+		
+		if (!originalResults) {
+			originalResults = document.createElement('div');
+			originalResults.id = 'citySearchResults';
+			originalResults.className = 'city-search-results';
+			originalResults.style.display = 'none';
+			document.body.appendChild(originalResults);
+		}
+		
+		// Перенаправляем ввод с карты на оригинальный элемент
+		mapInput.addEventListener('input', (e) => {
+			originalInput.value = e.target.value;
+			originalInput.dispatchEvent(new Event('input', { bubbles: true }));
+		});
+		
+		mapInput.addEventListener('keydown', (e) => {
+			originalInput.dispatchEvent(new KeyboardEvent('keydown', { 
+				key: e.key, 
+				bubbles: true,
+				cancelable: true
+			}));
+			// Предотвращаем стандартное поведение если нужно
+			if (['ArrowUp', 'ArrowDown', 'Enter', 'Escape'].includes(e.key)) {
+				e.preventDefault();
+			}
+		});
+		
+		// Перехватываем клики по результатам на карте и перенаправляем на оригинальную логику
+		mapResults.addEventListener('click', (e) => {
+			const resultItem = e.target.closest('.city-search-result-item');
+			if (resultItem) {
+				// Находим соответствующий элемент в оригинальных результатах
+				const items = originalResults.querySelectorAll('.city-search-result-item');
+				const index = Array.from(mapResults.querySelectorAll('.city-search-result-item')).indexOf(resultItem);
+				if (items[index]) {
+					items[index].click();
+				}
+			}
+		});
+		
+		// Перенаправляем результаты обратно на карту с правильной структурой
+		const observer = new MutationObserver(() => {
+			// Копируем HTML и классы
+			mapResults.innerHTML = originalResults.innerHTML;
+			
+			// Применяем класс show если нужно
+			if (originalResults.classList.contains('show')) {
+				mapResults.classList.add('show');
+			} else {
+				mapResults.classList.remove('show');
+			}
+			
+			// Обновляем подсветку выделенного элемента
+			const selectedOriginal = originalResults.querySelector('.city-search-result-item.selected');
+			const selectedMap = mapResults.querySelectorAll('.city-search-result-item');
+			
+			selectedMap.forEach((item, index) => {
+				if (selectedOriginal && selectedMap[index] === selectedOriginal) {
+					item.classList.add('selected');
+				} else {
+					item.classList.remove('selected');
+				}
+			});
+		});
+		
+		observer.observe(originalResults, { 
+			childList: true, 
+			attributes: true,
+			characterData: true,
+			subtree: true
+		});
+		
+		// Начальная синхронизация
+		mapResults.innerHTML = originalResults.innerHTML;
+		if (originalResults.classList.contains('show')) {
+			mapResults.classList.add('show');
+		}
+	}
+
+	// Создание placeholder для контрола рисования (инициализируется в map_shapes.js)
+	createDrawControlPlaceholder() {
+		const DrawControl = L.Control.extend({
+			options: {
+				position: 'topright'
+			},
+
+			onAdd: (map) => {
+				const container = L.DomUtil.create('div', 'draw-map-control');
+
+				L.DomEvent.disableClickPropagation(container);
+				L.DomEvent.disableScrollPropagation(container);
+
+				container.innerHTML = `
+					<button class="draw-toggle-btn" title="Рисование">
+						<span class="draw-icon">📐</span>
+					</button>
+					<div class="draw-map-panel" style="display: none;">
+						<button class="draw-mode-btn" data-mode="circle" title="Круг">⭕</button>
+						<button class="draw-mode-btn" data-mode="rectangle" title="Прямоугольник">⬜</button>
+						<button class="draw-mode-btn" data-mode="line" title="Линия">〰️</button>
+						<button class="draw-mode-btn" data-mode="polygon" title="Многоугольник">⬠</button>
+						<div class="draw-divider"></div>
+						<button class="draw-mode-btn" data-action="clear" title="Очистить все">🗑️</button>
+					</div>
+				`;
+
+				return container;
+			}
+		});
+
+		this.drawControl = new DrawControl();
+		this.drawControl.addTo(this.map);
+
+		// Возвращаем container для последующей инициализации в map_shapes.js
+		return this.drawControl.getContainer();
+	}
+
+	// Создание placeholder для контрола измерения расстояния (инициализируется в measurement.js)
+	createMeasurementControlPlaceholder() {
+		const MeasurementControl = L.Control.extend({
+			options: {
+				position: 'topright'
+			},
+
+			onAdd: (map) => {
+				const container = L.DomUtil.create('div', 'measurement-map-control');
+
+				L.DomEvent.disableClickPropagation(container);
+				L.DomEvent.disableScrollPropagation(container);
+
+				container.innerHTML = `
+					<button class="measurement-toggle-btn" title="Измерить расстояние">
+						<span class="measurement-icon">📏</span>
+					</button>
+					<div class="measurement-map-panel" style="display: none;">
+						<button class="measurement-start-btn" title="Начать измерение">Начать измерение</button>
+						<div class="measurement-divider"></div>
+						<button class="measurement-clear-btn" title="Очистить все измерения">🗑️ Очистить</button>
+					</div>
+				`;
+
+				return container;
+			}
+		});
+
+		this.measurementControl = new MeasurementControl();
+		this.measurementControl.addTo(this.map);
+
+		// Возвращаем container для последующей инициализации в measurement.js
+		return this.measurementControl.getContainer();
+	}
 
     iconMapping = {
         'LBmaster_Groups\\gui\\icons\\marker.paa': 'default',
@@ -233,6 +512,7 @@ class DayZMap {
         this.loadSearchHistory(); // Загружаем историю поиска
         this.loadTheme(); // Загружаем тему
         this.initMap();
+        this.initProfiles(); // Инициализируем менеджер профилей ПЕРЕД загрузкой меток
         this.bindEvents();
     }
 
@@ -265,14 +545,32 @@ class DayZMap {
 		this.map.setView(center, CONFIG.initialZoom);
 		
 		console.log('Карта инициализирована');
+
+		// Создаем контрол поиска города на карте
+		this.createCitySearchMapControl();
+
+		// Создаем контрол рисования (будет инициализирован после загрузки map_shapes.js)
+		this.createDrawControlPlaceholder();
+
+		// Создаем контрол измерения расстояния (будет инициализирован после загрузки measurement.js)
+		this.createMeasurementControlPlaceholder();
+
+		// Загружаем фоновые тайлы z3 (всегда на заднем плане)
+		this.loadBackgroundTiles();
 		
 		// Загружаем тайлы
 		this.loadTiles();
 		
-		// Загружаем маркеры и сетку независимо от тайлов
-		this.loadMarkers();
+		// Загружаем сетку и названия независимо от тайлов
 		this.addGrid();
 		this.initNames();
+	}
+
+	initProfiles() {
+		console.log('Инициализация менеджера профилей...');
+		this.profilesManager = new UserProfilesManager(this);
+		// Загружаем метки ПОСЛЕ инициализации менеджера профилей
+		this.loadMarkers();
 	}
 
 	// Инициализация данных названий из names_data.js
@@ -347,6 +645,45 @@ class DayZMap {
 				this.addNameLabel(nameData);
 			}
 		});
+	}
+
+	// Вспомогательная функция для создания popup метки
+	createMarkerPopup(markerData) {
+		return `
+			<div class="marker-popup">
+				<strong>${markerData.text}</strong><br>
+				Тип: ${this.getMarkerTypeName(markerData.type)}<br>
+				Координаты: X:${markerData.gameCoords.x} Y:${markerData.gameCoords.y} Z:${markerData.gameCoords.z || 0}<br>
+				&lt;${markerData.gameCoords.x} ${markerData.gameCoords.z || 0} ${markerData.gameCoords.y}&gt; ${markerData.gameCoords.degree || 0} Degree <button style="font-size: 12px; padding: 2px 4px; margin-left: 5px; border: none; background: none; cursor: pointer;" onclick="navigator.clipboard.writeText('&lt;${markerData.gameCoords.x} ${markerData.gameCoords.z || 0} ${markerData.gameCoords.y}&gt; ${markerData.gameCoords.degree || 0} Degree')">📋</button>
+			</div>
+		`;
+	}
+
+	// Вспомогательные функции для показа сообщений
+	showSuccess(message) {
+		// Можно использовать существующую систему уведомлений или создать простую
+		console.log('Success:', message);
+		// Если есть существующий метод showMessage, используем его
+		if (typeof this.showMessage === 'function') {
+			this.showMessage(message, 'success');
+		}
+	}
+
+	showError(message) {
+		console.error('Error:', message);
+		// Если есть существующий метод showMessage, используем его
+		if (typeof this.showMessage === 'function') {
+			this.showMessage(message, 'error');
+		}
+	}
+
+	// Показать подсказку (используется в measurement.js и map_shapes.js)
+	showHint(message) {
+		console.log('Hint:', message);
+		// Если есть существующий метод showMessage, используем его
+		if (typeof this.showMessage === 'function') {
+			this.showMessage(message, 'info');
+		}
 	}
 
 	// Добавить метку названия на карту
@@ -456,8 +793,14 @@ class DayZMap {
         const tileSet = this.getCurrentTileSet(currentZoom);
         const config = CONFIG.tileSets[tileSet];
         
+        // Устанавливаем lastTileSet при первой загрузке
+        if (!this.lastTileSet) {
+            this.lastTileSet = tileSet;
+        }
+        
         const bounds = this.map.getBounds();
-        const pixelBounds = this.getVisibleTileBounds(bounds, config.gridSize);
+        // Используем preloadBuffer для предзагрузки тайлов
+        const pixelBounds = this.getVisibleTileBoundsWithBuffer(bounds, config.gridSize);
         
         if (this.shouldReloadTiles(pixelBounds)) {
             console.log(`Загрузка видимых тайлов (${tileSet}): ${pixelBounds.minX}-${pixelBounds.maxX}, ${pixelBounds.minY}-${pixelBounds.maxY}`);
@@ -467,6 +810,26 @@ class DayZMap {
 			await this.loadTilesInBounds(pixelBounds, tileSet, generation);
 			this.lastLoadBounds = pixelBounds;
         }
+    }
+
+	// Получить границы с буфером для prefetching
+	getVisibleTileBoundsWithBuffer(bounds, gridSize) {
+        const southWest = bounds.getSouthWest();
+        const northEast = bounds.getNorthEast();
+        const buffer = CONFIG.lazyLoading.preloadBuffer || 4;
+        
+        const minX = Math.max(0, Math.floor(southWest.lng / 32 * gridSize) - buffer);
+        const maxX = Math.min(gridSize - 1, Math.floor(northEast.lng / 32 * gridSize) + buffer);
+        const minY = Math.max(0, Math.floor((32 - northEast.lat) / 32 * gridSize) - buffer);
+        const maxY = Math.min(gridSize - 1, Math.floor((32 - southWest.lat) / 32 * gridSize) + buffer);
+        
+        return {
+            minX,
+            maxX,
+            minY,
+            maxY,
+            gridSize
+        };
     }
 
 	getVisibleTileBounds(bounds, gridSize) {
@@ -491,10 +854,11 @@ class DayZMap {
 	shouldReloadTiles(newBounds) {
         if (!this.lastLoadBounds) return true;
         
-        return Math.abs(newBounds.minX - this.lastLoadBounds.minX) > 1 ||
-               Math.abs(newBounds.maxX - this.lastLoadBounds.maxX) > 1 ||
-               Math.abs(newBounds.minY - this.lastLoadBounds.minY) > 1 ||
-               Math.abs(newBounds.maxY - this.lastLoadBounds.maxY) > 1;
+        // Уменьшенный порог для более быстрой реакции
+        return Math.abs(newBounds.minX - this.lastLoadBounds.minX) > 0 ||
+               Math.abs(newBounds.maxX - this.lastLoadBounds.maxX) > 0 ||
+               Math.abs(newBounds.minY - this.lastLoadBounds.minY) > 0 ||
+               Math.abs(newBounds.maxY - this.lastLoadBounds.maxY) > 0;
     }
 	
 	//загрузка тайлов в области
@@ -593,6 +957,8 @@ class DayZMap {
 			}
             try {
                 const layer = L.imageOverlay(url, bounds).addTo(this.map);
+                // Устанавливаем z-index выше фоновых тайлов
+                layer.getElement().style.zIndex = '1';
                 resolve(layer);
             } catch (error) {
                 reject(error);
@@ -608,7 +974,7 @@ class DayZMap {
         
         timeoutId = setTimeout(() => {
             reject(new Error(`Таймаут загрузки: ${fileName}`));
-        }, 8000);
+        }, CONFIG.lazyLoading.timeout || 4000);
     }
 
 	scheduleUnloadOutOfBoundsTiles(currentBounds, tileSet) {
@@ -785,6 +1151,33 @@ class DayZMap {
                 ">×</button>
             </div>
             <p style="margin: 0;">${message}</p>
+			<!-- 🔔 ДОБАВИТЬ: Гифка под ошибкой 
+			<img src="lnk/error_typing.gif" alt="Error" style="
+				display: block;
+				margin: 15px auto 0;
+				max-width: 100%;
+				max-height: 300px;
+				border-radius: 5px;
+				border: 2px solid #c0392b;
+			"> -->
+			<!-- 🔔 Локальное видео вместо гифки -->
+			<video 
+      				src="lnk/error_vid2.webm" 
+				autoplay  
+				loop 
+				playsinline
+              preload="auto"
+				style="
+					display: block;
+					margin: 15px auto 0;
+					width: 100%;
+					max-width: 560px;
+					max-height: 315px;
+					border-radius: 5px;
+					border: 2px solid #c0392b;
+					background: #000;
+				"
+			></video>
         `;
         
         document.getElementById('map').appendChild(errorDiv);
@@ -821,7 +1214,12 @@ class DayZMap {
                 errorDiv.remove();
                 document.removeEventListener('keydown', keyHandler);
             }
-        }, 3000);
+        }, 600000);
+        
+        // 🔔 Открыть видео-инструкцию в новой вкладке через 2 секунды
+        //setTimeout(() => {
+        //    window.open('https://www.youtube.com/watch?v=FhXRJlvlOiA', '_blank');
+        //}, 2000);
         
         // Очистка таймера при ручном закрытии
         closeBtn.addEventListener('click', () => {
@@ -871,6 +1269,22 @@ class DayZMap {
             if (clearMarkersBtn) {
                 clearMarkersBtn.addEventListener('click', () => {
                     this.clearAllMarkers();
+                });
+            }
+
+            // Кнопка построения маршрута
+            const buildRouteBtn = document.getElementById('buildRouteBtn');
+            if (buildRouteBtn) {
+                buildRouteBtn.addEventListener('click', () => {
+                    this.buildRoute();
+                });
+            }
+
+            // Кнопка очистки маршрута
+            const clearRouteBtn = document.getElementById('clearRouteBtn');
+            if (clearRouteBtn) {
+                clearRouteBtn.addEventListener('click', () => {
+                    this.clearRoute();
                 });
             }
 
@@ -927,17 +1341,195 @@ class DayZMap {
 				});
 			}
 			
-			// Кнопка для экспорта на серверы
-			const exportToServersButton = document.createElement('button');
-			exportToServersButton.textContent = 'Экспорт меток';
-			exportToServersButton.style.marginLeft = '10px';
-			exportToServersButton.addEventListener('click', () => {
-				this.exportMarkersToServers();
-			});
+			// Обработчики для выпадающего меню Инструменты
+			const toolsDropdownBtn = document.getElementById('toolsDropdownBtn');
+			const toolsDropdownMenu = document.getElementById('toolsDropdownMenu');
 			
-			const controls = document.querySelector('.controls');
-			if (controls) {
-				controls.appendChild(exportToServersButton);
+			if (toolsDropdownBtn && toolsDropdownMenu) {
+				// Переключение меню
+				toolsDropdownBtn.addEventListener('click', (e) => {
+					e.stopPropagation();
+					const isOpen = toolsDropdownMenu.classList.toggle('show');
+					toolsDropdownBtn.classList.toggle('active', isOpen);
+				});
+				
+				// Закрытие меню при клике вне его
+				document.addEventListener('click', (e) => {
+					if (!e.target.closest('.tools-dropdown')) {
+						toolsDropdownMenu.classList.remove('show');
+						toolsDropdownBtn.classList.remove('active');
+					}
+				});
+				
+				// Кнопка Импорт меток
+				const importMarkersBtn = document.getElementById('importMarkersBtn');
+				if (importMarkersBtn) {
+					const fileInput = document.createElement('input');
+					fileInput.type = 'file';
+					fileInput.accept = '.json';
+					fileInput.style.display = 'none';
+					fileInput.addEventListener('change', (e) => {
+						const file = e.target.files[0];
+						if (file) {
+							const reader = new FileReader();
+							reader.onload = (event) => {
+								try {
+									console.log('Начинаем импорт файла:', file.name);
+									this.importMarkersFromJSON(event.target.result);
+								} catch (error) {
+									console.error('Ошибка чтения файла:', error);
+									this.showError('Ошибка при импорте меток. Убедитесь, что это валидный JSON файл с метками DayZ.');
+								}
+							};
+							reader.onerror = () => {
+								this.showError('Ошибка при чтении файла');
+							};
+							reader.readAsText(file);
+						}
+					});
+					document.body.appendChild(fileInput);
+
+					importMarkersBtn.addEventListener('click', () => {
+						fileInput.click();
+						toolsDropdownMenu.classList.remove('show');
+					});
+				}
+
+				// Кнопка Массовый ввод меток
+				const bulkImportMarkersBtn = document.getElementById('bulkImportMarkersBtn');
+				if (bulkImportMarkersBtn) {
+					bulkImportMarkersBtn.addEventListener('click', () => {
+						if (this.bulkImportManager) {
+							this.bulkImportManager.showImportModal();
+						} else {
+							this.showError('Менеджер импорта не инициализирован');
+						}
+						toolsDropdownMenu.classList.remove('show');
+					});
+				}
+
+				// Кнопка Экспорт меток
+				const exportMarkersBtn = document.getElementById('exportMarkersBtn');
+				if (exportMarkersBtn) {
+					exportMarkersBtn.addEventListener('click', () => {
+						this.exportMarkersToServers();
+						toolsDropdownMenu.classList.remove('show');
+					});
+				}
+
+				// Кнопка Импорт фигур
+				const importShapesBtn = document.getElementById('importShapesBtn');
+				if (importShapesBtn) {
+					importShapesBtn.addEventListener('click', () => {
+						if (this.shapesManager) {
+							this.shapesManager.showImportDialog();
+						} else {
+							this.showError('Менеджер фигур еще не инициализирован');
+						}
+						toolsDropdownMenu.classList.remove('show');
+					});
+				}
+
+				// Кнопка Экспорт фигур
+				const exportShapesBtn = document.getElementById('exportShapesBtn');
+				if (exportShapesBtn) {
+					exportShapesBtn.addEventListener('click', () => {
+						if (this.shapesManager) {
+							this.shapesManager.exportShapes();
+						} else {
+							this.showError('Менеджер фигур еще не инициализирован');
+						}
+						toolsDropdownMenu.classList.remove('show');
+					});
+				}
+
+				// Кнопка Splitter
+				const splitterBtn = document.getElementById('splitterBtn');
+				if (splitterBtn) {
+					splitterBtn.addEventListener('click', () => {
+						window.open('splitter/splitter.html', '_blank');
+						toolsDropdownMenu.classList.remove('show');
+						toolsDropdownBtn.classList.remove('active');
+					});
+				}
+
+				// Кнопка Таймеры
+				const timersBtn = document.getElementById('timersBtn');
+				if (timersBtn) {
+					timersBtn.addEventListener('click', () => {
+						window.open('timers/timers.html', '_blank');
+						toolsDropdownMenu.classList.remove('show');
+						toolsDropdownBtn.classList.remove('active');
+					});
+				}
+
+				// Кнопка Конвертер валюты
+				const currencyConverterBtn = document.getElementById('currencyConverterBtn');
+				if (currencyConverterBtn) {
+					currencyConverterBtn.addEventListener('click', () => {
+						window.open('https://ywconverter.silthost.ru/', '_blank');
+						toolsDropdownMenu.classList.remove('show');
+						toolsDropdownBtn.classList.remove('active');
+					});
+				}
+
+				// Кнопка Выделение области
+				const areaSelectionBtn = document.getElementById('areaSelectionBtn');
+				if (areaSelectionBtn) {
+					areaSelectionBtn.addEventListener('click', () => {
+						this.toggleAreaSelectionMode();
+						toolsDropdownMenu.classList.remove('show');
+						toolsDropdownBtn.classList.remove('active');
+					});
+				}
+
+				// Кнопка Копировать путь к папке с метками
+				const copyPathBtn = document.getElementById('copyPathBtn');
+				if (copyPathBtn) {
+					copyPathBtn.addEventListener('click', async () => {
+						const path = 'C:\\Users\\%USERNAME%\\AppData\\Local\\DayZ\\LBmaster\\Config\\LBGroup\\';
+						try {
+							await navigator.clipboard.writeText(path);
+							alert('Путь скопирован в буфер обмена:\n' + path);
+						} catch (err) {
+							// Фолбэк для старых браузеров
+							const textArea = document.createElement('textarea');
+							textArea.value = path;
+							document.body.appendChild(textArea);
+							textArea.select();
+							document.execCommand('copy');
+							document.body.removeChild(textArea);
+							alert('Путь скопирован в буфер обмена:\n' + path);
+						}
+						toolsDropdownMenu.classList.remove('show');
+						toolsDropdownBtn.classList.remove('active');
+					});
+				}
+
+				// Кнопка Скачать ярлык к папке с метками
+				const downloadLinkBtn = document.getElementById('downloadLinkBtn');
+				if (downloadLinkBtn) {
+					downloadLinkBtn.addEventListener('click', () => {
+						const link = document.createElement('a');
+						link.href = 'lnk/LBGroup.rar';
+						link.download = 'LBGroup.rar';
+						document.body.appendChild(link);
+						link.click();
+						document.body.removeChild(link);
+						toolsDropdownMenu.classList.remove('show');
+						toolsDropdownBtn.classList.remove('active');
+					});
+				}
+
+				// Закрытие меню при выборе темы
+				const themeSelector = document.getElementById('themeSelector');
+				if (themeSelector) {
+					themeSelector.addEventListener('change', (e) => {
+						this.setTheme(e.target.value);
+						toolsDropdownMenu.classList.remove('show');
+						toolsDropdownBtn.classList.remove('active');
+					});
+				}
 			}
 			
             const exportFilteredToServersBtn = document.getElementById('exportFilteredToServersBtn');
@@ -977,6 +1569,10 @@ class DayZMap {
                 if (this.gridEnabled) {
                     this.updateAxes();
                 }
+                // Загружаем тайлы сразу после остановки движения
+                if (CONFIG.lazyLoading.enabled) {
+                    this.loadTiles();
+                }
             });
 			
 			this.map.on('resize', () => {
@@ -985,24 +1581,14 @@ class DayZMap {
                 }
             });
 
-            // Кнопка для импорта меток из JSON
-            const importButton = document.createElement('button');
-            importButton.textContent = 'Импорт меток';
-            importButton.style.marginLeft = '10px';
+			// Обработчик для кнопки toggle координат
+			const toggleCoordsBtn = document.getElementById('toggleCoordsBtn');
+			if (toggleCoordsBtn) {
+				toggleCoordsBtn.addEventListener('click', () => {
+					this.toggleCoordsInputsBlock();
+				});
+			}
 
-            const fileInput = document.createElement('input');
-            fileInput.type = 'file';
-            fileInput.accept = '.json';
-            fileInput.style.display = 'none';
-            fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
-
-            importButton.addEventListener('click', () => {
-                fileInput.click();
-            });
-
-            document.querySelector('.controls').appendChild(importButton);
-            document.querySelector('.controls').appendChild(fileInput);
-			
 			// Обработчики для новых кнопок координат DayZ
 			const centerCoordsBtn = document.getElementById('centerCoordsBtn');
 			if (centerCoordsBtn) {
@@ -1043,7 +1629,18 @@ class DayZMap {
                     this.toggleNamesVisibility();
                 });
             }
+
+            // Инициализация поиска городов
+            this.initializeCitySearch();
 			
+			// Обработчик для центрирования по координатам
+            const centerOnCoordsBtn = document.getElementById('centerOnCoordsBtn');
+            if (centerOnCoordsBtn) {
+                centerOnCoordsBtn.addEventListener('click', () => {
+                    this.centerOnCoords();
+                });
+            }
+
 			// Обработчик для добавления метки по координатам
             const addMarkerByCoordsBtn = document.getElementById('addMarkerByCoords');
             if (addMarkerByCoordsBtn) {
@@ -1091,15 +1688,37 @@ class DayZMap {
 				const currentTileSet = this.getCurrentTileSet(newZoom);
 
 				// 2. Проверяем смену набора тайлов
-				if (this.lastTileSet !== currentTileSet) {
+				if (this.lastTileSet && this.lastTileSet !== currentTileSet) {
 					console.log(`Переключение с ${this.lastTileSet} на ${currentTileSet} тайлы`);
-					this.clearAllTiles();
+					
+					// Сохраняем старый набор для очистки
+					const oldTileSet = this.lastTileSet;
+					
+					// Обновляем lastTileSet сразу
 					this.lastTileSet = currentTileSet;
-				}
-
-				// 3. Загружаем тайлы для новой области (если ленивая загрузка включена)
-				if (CONFIG.lazyLoading.enabled) {
-					this.loadTiles();
+					
+					// Сбрасываем lastLoadBounds чтобы принудительно загрузить новые тайлы
+					this.lastLoadBounds = null;
+					
+					// Сначала загружаем новые тайлы
+					if (CONFIG.lazyLoading.enabled) {
+						this.loadTiles();
+					}
+					
+					// Задержка перед очисткой старых тайлов (удаляем только старый набор)
+					setTimeout(() => {
+						this.clearTilesForSet(oldTileSet);
+					}, 500);
+				} else {
+					// Обновляем lastTileSet если он ещё не установлен
+					if (!this.lastTileSet) {
+						this.lastTileSet = currentTileSet;
+					}
+					
+					// 3. Загр��жаем тайлы для новой области (если ленивая загрузка включена)
+					if (CONFIG.lazyLoading.enabled) {
+						this.loadTiles();
+					}
 				}
 
 				// 4. Обновляем поиск если он активен (дополнительная логика если нужна)
@@ -1145,14 +1764,7 @@ class DayZMap {
 				});
 			}
 
-			// Обработчик для селектора темы
-			const themeSelector = document.getElementById('themeSelector');
-			if (themeSelector) {
-				themeSelector.addEventListener('change', (e) => {
-					this.setTheme(e.target.value);
-				});
-			}
-
+			
         } catch (error) {
             console.error('Ошибка при привязке событий:', error);
         }
@@ -1167,6 +1779,78 @@ class DayZMap {
         this.currentTileLayers.clear();
         this.lastLoadBounds = null;
     }
+	
+	// Загрузка фоновых тайлов z3 (всегда на заднем плане)
+	async loadBackgroundTiles() {
+		const config = CONFIG.tileSets.z3;
+		const gridSize = config.gridSize; // 8
+		const totalTiles = gridSize * gridSize; // 64
+		
+		console.log(`Загрузка фоновых тайлов z3: ${totalTiles} шт.`);
+		
+		let loaded = 0;
+		const promises = [];
+		
+		for (let x = 0; x < gridSize; x++) {
+			for (let y = 0; y < gridSize; y++) {
+				const tileKey = `bg_z3_${x}_${y}`;
+				
+				// Пропускаем если уже загружен
+				if (this.backgroundLayers.has(tileKey)) continue;
+				
+				const fileName = this.getTileFileName(x, y, 'z3');
+				const url = `${config.folder}/${fileName}`;
+				const bounds = this.tileToLeafletBounds(x, y, 'z3');
+				
+				const promise = new Promise((resolve) => {
+					const img = new Image();
+					img.onload = () => {
+						const layer = L.imageOverlay(url, bounds, {
+							zIndex: 0 // Фоновые тайлы всегда позади
+						}).addTo(this.map);
+						
+						// Устанавливаем z-index через DOM
+						layer.getElement().style.zIndex = '0';
+						
+						this.backgroundLayers.set(tileKey, layer);
+						loaded++;
+						resolve();
+					};
+					img.onerror = () => {
+						resolve(); // Продолжаем даже при ошибке
+					};
+					img.src = url;
+				});
+				
+				promises.push(promise);
+			}
+		}
+		
+		await Promise.all(promises);
+		console.log(`Загружено фоновых тайлов z3: ${loaded}`);
+	}
+	
+	// Очистка тайлов только определенного набора
+	clearTilesForSet(tileSet) {
+		const keysToRemove = [];
+		
+		for (const tileKey of this.loadedTiles) {
+			if (tileKey.startsWith(tileSet + '_')) {
+				keysToRemove.push(tileKey);
+			}
+		}
+		
+		keysToRemove.forEach(tileKey => {
+			const layer = this.currentTileLayers.get(tileKey);
+			if (layer) {
+				this.map.removeLayer(layer);
+				this.currentTileLayers.delete(tileKey);
+			}
+			this.loadedTiles.delete(tileKey);
+		});
+		
+		console.log(`Очищено ${keysToRemove.length} тайлов для набора ${tileSet}`);
+	}
 	
 	// Метод для преобразования игровых координат в Leaflet координаты
     gameToLeafletCoords(gameX, gameY) {
@@ -1186,8 +1870,8 @@ class DayZMap {
 			return;
 		}
 
-		const x = parseInt(coordXInput.value);
-		const y = parseInt(coordYInput.value);
+		const x = parseFloat(coordXInput.value);
+		const y = parseFloat(coordYInput.value);
 
 		// Валидация координат
 		if (isNaN(x) || isNaN(y)) {
@@ -1216,6 +1900,333 @@ class DayZMap {
 		// Очищаем поля ввода после успешного добавления
 		coordXInput.value = '';
 		coordYInput.value = '';
+	}
+
+	// Метод для переключения блока ввода координат
+	toggleCoordsInputsBlock() {
+		let coordsBlock = document.getElementById('coordsInputsBlock');
+		const toggleBtn = document.getElementById('toggleCoordsBtn');
+
+		if (!coordsBlock || !toggleBtn) return;
+
+		const isVisible = coordsBlock.style.display !== 'none';
+
+		if (isVisible) {
+			coordsBlock.style.display = 'none';
+		} else {
+			// Перемещаем блок в body для корректного z-index
+			if (coordsBlock.parentNode !== document.body) {
+				document.body.appendChild(coordsBlock);
+			}
+
+			// Показываем блок
+			coordsBlock.style.display = 'block';
+
+			// Даем браузеру время на рендеринг, затем позиционируем
+			setTimeout(() => {
+				// Рассчитываем позицию под кнопкой
+				const rect = toggleBtn.getBoundingClientRect();
+				const blockHeight = coordsBlock.offsetHeight;
+				const blockWidth = coordsBlock.offsetWidth;
+
+				// Позиционируем под кнопкой, центрируя по горизонтали
+				coordsBlock.style.top = (rect.bottom + window.scrollY + 5) + 'px';
+				coordsBlock.style.left = (rect.left + window.scrollX + rect.width / 2 - blockWidth / 2) + 'px';
+
+				// Убеждаемся, что блок не выходит за границы экрана
+				const viewportWidth = window.innerWidth + window.scrollX;
+				const viewportHeight = window.innerHeight + window.scrollY;
+
+				const left = parseInt(coordsBlock.style.left);
+				const top = parseInt(coordsBlock.style.top);
+
+				if (left < 10) {
+					coordsBlock.style.left = '10px';
+				}
+
+				if (left + blockWidth > viewportWidth - 10) {
+					coordsBlock.style.left = (viewportWidth - blockWidth - 10) + 'px';
+				}
+
+				if (top + blockHeight > viewportHeight - 10) {
+					coordsBlock.style.top = (rect.top + window.scrollY - blockHeight - 5) + 'px';
+				}
+			}, 1);
+		}
+	}
+
+	// Метод для показа тултипа с координатами
+	showCoordsTooltip() {
+		// Удаляем старый тултип если есть
+		const oldTooltip = document.querySelector('.coords-tooltip');
+		if (oldTooltip) {
+			oldTooltip.remove();
+		}
+
+		const tooltip = document.createElement('div');
+		tooltip.className = 'coords-tooltip';
+
+		// Создаем HTML для тултипа с элементами координат
+		tooltip.innerHTML = `
+			<div class="coords-tooltip-content">
+				<input type="number" id="tooltipCoordX" placeholder="X" min="0" max="15360">
+				<input type="number" id="tooltipCoordY" placeholder="Y" min="0" max="15360">
+				<button id="tooltipCenterOnCoordsBtn">Центрировать</button>
+				<button id="tooltipAddMarkerByCoords">Добавить по координатам</button>
+			</div>
+		`;
+
+		// Добавляем тултип в DOM сначала чтобы получить его размеры
+		document.body.appendChild(tooltip);
+
+		// Позиционируем тултип под кнопкой
+		const toggleCoordsBtn = document.getElementById('toggleCoordsBtn');
+		const rect = toggleCoordsBtn.getBoundingClientRect();
+		const tooltipHeight = tooltip.offsetHeight;
+
+		tooltip.style.position = 'fixed';
+		tooltip.style.top = (rect.bottom + 10) + 'px'; // Позиционируем под кнопкой
+		tooltip.style.left = (rect.left + rect.width / 2 - tooltip.offsetWidth / 2) + 'px'; // Центрируем
+
+		// Добавляем обработчики для кнопок в тултипе
+		const centerBtn = tooltip.querySelector('#tooltipCenterOnCoordsBtn');
+		const addBtn = tooltip.querySelector('#tooltipAddMarkerByCoords');
+		const coordXInput = tooltip.querySelector('#tooltipCoordX');
+		const coordYInput = tooltip.querySelector('#tooltipCoordY');
+
+		if (centerBtn) {
+			centerBtn.addEventListener('click', () => {
+				this.centerOnCoords(coordXInput.value, coordYInput.value);
+				tooltip.remove(); // Закрываем тултип после действия
+			});
+		}
+
+		if (addBtn) {
+			addBtn.addEventListener('click', () => {
+				this.addMarkerByCoordinates(coordXInput.value, coordYInput.value);
+				tooltip.remove(); // Закрываем тултип после действия
+			});
+		}
+
+		// Обработчик для закрытия при клике вне тултипа
+		const clickHandler = (e) => {
+			if (!tooltip.contains(e.target) && e.target !== toggleCoordsBtn) {
+				if (tooltip.parentNode) {
+					tooltip.parentNode.removeChild(tooltip);
+				}
+				document.removeEventListener('click', clickHandler);
+			}
+		};
+
+		// Обработчик для закрытия по ESC
+		const keyHandler = (e) => {
+			if (e.key === 'Escape') {
+				if (tooltip.parentNode) {
+					tooltip.parentNode.removeChild(tooltip);
+				}
+				document.removeEventListener('keydown', keyHandler);
+				document.removeEventListener('click', clickHandler);
+			}
+		};
+
+		// Добавляем обработчики
+		setTimeout(() => {
+			document.addEventListener('click', clickHandler);
+			document.addEventListener('keydown', keyHandler);
+		}, 100);
+	}
+
+	// Метод для определения зума при центрировании (сохраняет текущий зум если он больше заданного)
+	getCenteringZoom(defaultZoom = 8) {
+		const currentZoom = this.map.getZoom();
+		return currentZoom > defaultZoom ? currentZoom : defaultZoom;
+	}
+
+	// Метод для центрирования по координатам
+	centerOnCoords(coordX, coordY) {
+		let x, y;
+
+		if (coordX !== undefined && coordY !== undefined) {
+			// Значения переданы из тултипа
+			x = parseFloat(coordX);
+			y = parseFloat(coordY);
+		} else {
+			// Старый способ для обратной совместимости
+			const coordXInput = document.getElementById('coordX');
+			const coordYInput = document.getElementById('coordY');
+
+			if (!coordXInput || !coordYInput) {
+				this.showError('Поля для ввода координат не найдены');
+				return;
+			}
+
+			x = parseFloat(coordXInput.value);
+			y = parseFloat(coordYInput.value);
+		}
+
+		if (isNaN(x) || isNaN(y)) {
+			this.showError('Введите корректные числовые значения для координат');
+			return;
+		}
+
+		if (x < 0 || x > CONFIG.mapPixelWidth || y < 0 || y > CONFIG.mapPixelHeight) {
+			this.showError(`Координаты должны быть в пределах: X: 0-${CONFIG.mapPixelWidth}, Y: 0-${CONFIG.mapPixelHeight}`);
+			return;
+		}
+
+		const gameCoords = { x: x, y: y };
+		const leafletLatLng = this.gameToLeafletCoords(x, y);
+
+		this.map.setView(leafletLatLng, this.getCenteringZoom(8));
+
+		this.showTemporaryMarker(leafletLatLng, gameCoords.x, gameCoords.y, gameCoords.z || 0);
+
+		this.showSuccess(`Центрировано на координатах: X:${x} Y:${y}`);
+	}
+
+	// Инициализация поиска городов
+	initializeCitySearch() {
+		const searchInput = document.getElementById('citySearchInput');
+		const resultsContainer = document.getElementById('citySearchResults');
+
+		if (!searchInput || !resultsContainer) {
+			console.error('Элементы поиска городов не найдены');
+			return;
+		}
+
+		let selectedIndex = -1;
+		let searchTimeout;
+
+		// Функция поиска городов
+		const searchCities = (query) => {
+			if (!query.trim()) {
+				resultsContainer.classList.remove('show');
+				return;
+			}
+
+			const filteredCities = this.namesData.filter(city => 
+				city.name.toLowerCase().includes(query.toLowerCase())
+			).slice(0, 10); // Ограничиваем до 10 результатов
+
+			this.displayCitySearchResults(filteredCities, query);
+		};
+
+		// Функция отображения результатов
+		this.displayCitySearchResults = (cities, query) => {
+			resultsContainer.innerHTML = '';
+			selectedIndex = -1;
+
+			if (cities.length === 0) {
+				resultsContainer.innerHTML = '<div class="city-search-result-item">Города не найдены</div>';
+				resultsContainer.classList.add('show');
+				return;
+			}
+
+			cities.forEach((city, index) => {
+				const item = document.createElement('div');
+				item.className = 'city-search-result-item';
+				item.innerHTML = `
+					<span class="city-name">${this.highlightMatch(city.name, query)}</span>
+					<span class="city-type">${this.getCityTypeLabel(city.type)}</span>
+				`;
+
+				item.addEventListener('click', () => {
+					this.selectCity(city);
+					resultsContainer.classList.remove('show');
+					searchInput.value = city.name;
+				});
+
+				resultsContainer.appendChild(item);
+			});
+
+			resultsContainer.classList.add('show');
+		};
+
+		// Функция подсветки совпадений
+		this.highlightMatch = (text, query) => {
+			const regex = new RegExp(`(${query})`, 'gi');
+			return text.replace(regex, '<strong>$1</strong>');
+		};
+
+		// Функция получения типа города
+		this.getCityTypeLabel = (type) => {
+			const labels = {
+				'Capital': 'Столица',
+				'City': 'Город',
+				'Village': 'Деревня',
+				'Camp': 'Лагерь'
+			};
+			return labels[type] || type;
+		};
+
+		// Функция выбора города
+		this.selectCity = (city) => {
+			const [x, y] = city.position;
+			const leafletLatLng = this.gameToLeafletCoords(x, y);
+			
+			// Центрируем на городе с зумом 8
+			this.map.setView(leafletLatLng, 8);
+			
+			// Показываем временную метку
+			//this.showTemporaryMarker(leafletLatLng, x, y, 0);
+			
+			this.showSuccess(`Центрировано на городе: ${city.name}`);
+		};
+
+		// Обработчик ввода с дебаунсингом
+		searchInput.addEventListener('input', (e) => {
+			clearTimeout(searchTimeout);
+			searchTimeout = setTimeout(() => {
+				searchCities(e.target.value);
+			}, 300);
+		});
+
+		// Обработчики клавиатуры для навигации
+		searchInput.addEventListener('keydown', (e) => {
+			const items = resultsContainer.querySelectorAll('.city-search-result-item');
+			
+			if (e.key === 'ArrowDown') {
+				e.preventDefault();
+				selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+				this.updateSelectedCity(items, selectedIndex);
+			} else if (e.key === 'ArrowUp') {
+				e.preventDefault();
+				selectedIndex = Math.max(selectedIndex - 1, -1);
+				this.updateSelectedCity(items, selectedIndex);
+			} else if (e.key === 'Enter') {
+				e.preventDefault();
+				if (selectedIndex >= 0 && items[selectedIndex]) {
+					items[selectedIndex].click();
+				} else {
+					// Если ничего не выбрано, ищем точное совпадение
+					const query = searchInput.value.trim();
+					const exactMatch = this.namesData.find(city => 
+						city.name.toLowerCase() === query.toLowerCase()
+					);
+					if (exactMatch) {
+						this.selectCity(exactMatch);
+						resultsContainer.classList.remove('show');
+					}
+				}
+			} else if (e.key === 'Escape') {
+				resultsContainer.classList.remove('show');
+				searchInput.blur();
+			}
+		});
+
+		// Закрытие результатов при клике вне
+		document.addEventListener('click', (e) => {
+			if (!e.target.closest('.city-search-container')) {
+				resultsContainer.classList.remove('show');
+			}
+		});
+
+		// Функция обновления выбранного элемента
+		this.updateSelectedCity = (items, index) => {
+			items.forEach((item, i) => {
+				item.classList.toggle('selected', i === index);
+			});
+		};
 	}
 	
     toggleGrid() {
@@ -1535,6 +2546,11 @@ class DayZMap {
         // Показываем модальное окно для ввода параметров метки
         this.showAddMarkerModal(leafletLatLng, gameCoords);
     }
+
+    // Метод для добавления метки с направлением (degree)
+    addMarkerWithDirection(leafletLatLng, gameCoords) {
+        this.showAddMarkerModal(leafletLatLng, gameCoords);
+    }
     
 	showAddMarkerModal(leafletLatLng, gameCoords) {
 		// Закрываем все существующие модальные окна перед созданием нового
@@ -1767,6 +2783,13 @@ class DayZMap {
 
 		const marker = L.marker(leafletLatLng, { icon: icon });
 
+		// Добавляем double-click обработчик ДО привязки popup
+		marker.on('dblclick', (e) => {
+			e.originalEvent.preventDefault();
+			e.originalEvent.stopPropagation();
+			this.editMarker(markerData);
+		});
+
 		const textLabel = L.marker(leafletLatLng, {
 			icon: this.createTextLabel(markerText, markerColor, opacity),
 			interactive: false
@@ -1780,10 +2803,10 @@ class DayZMap {
 
 		marker.bindPopup(`
 				<div class="marker-popup">
-					<strong>${markerText}</strong>
-					<br>
+					<strong>${markerText}</strong><br>
 					Тип: ${this.getMarkerTypeName(markerType)}<br>
-					Координаты: X:${gameCoords.x} Y:${gameCoords.y}${gameCoords.z ? ` Z:${gameCoords.z}` : ''}
+					Координаты: X:${gameCoords.x} Y:${gameCoords.y} Z:${gameCoords.z || 0}<br>
+					&lt;${gameCoords.x} ${gameCoords.z || 0} ${gameCoords.y}&gt; ${gameCoords.degree || 0} Degree <button style="font-size: 12px; padding: 2px 4px; margin-left: 5px; border: none; background: none; cursor: pointer;" onclick="navigator.clipboard.writeText('&lt;${gameCoords.x} ${gameCoords.z || 0} ${gameCoords.y}&gt; ${gameCoords.degree || 0} Degree')">📋</button>
 				</div>
 			`);
 
@@ -1825,10 +2848,6 @@ class DayZMap {
 			textLabel: textLabel,
 			originalData: originalData // Сохраняем оригинальные данные
 		};
-
-		marker.on('dblclick', () => {
-			this.editMarker(markerData);
-		});
 
 		this.markers.push(markerData);
 		this.saveMarkers();
@@ -2213,10 +3232,10 @@ class DayZMap {
 
 		markerData.marker.bindPopup(`
 			<div class="marker-popup">
-				<strong>${newText}</strong>
-				<br>
+				<strong>${newText}</strong><br>
 				Тип: ${this.getMarkerTypeName(newType)}<br>
-				Координаты: X:${markerData.gameCoords.x} Y:${markerData.gameCoords.y}${markerData.gameCoords.z ? ` Z:${markerData.gameCoords.z}` : ''}
+				Координаты: X:${markerData.gameCoords.x} Y:${markerData.gameCoords.y} Z:${markerData.gameCoords.z || 0}<br>
+				&lt;${markerData.gameCoords.x} ${markerData.gameCoords.z || 0} ${markerData.gameCoords.y}&gt; ${markerData.gameCoords.degree || 0} Degree <button style="font-size: 12px; padding: 2px 4px; margin-left: 5px; border: none; background: none; cursor: pointer;" onclick="navigator.clipboard.writeText('&lt;${markerData.gameCoords.x} ${markerData.gameCoords.z || 0} ${markerData.gameCoords.y}&gt; ${markerData.gameCoords.degree || 0} Degree')">📋</button>
 			</div>
 		`);
 
@@ -2279,10 +3298,24 @@ class DayZMap {
 	renderMarkersList() {
 		const container = document.getElementById('markersContainer');
 		if (!container) return;
+
+		// Удаляем существующие placeholder перед перерисовк��й, если не идет drag
+		if (!this.isDragging) {
+			const existingPlaceholders = container.querySelectorAll('.drag-placeholder');
+			existingPlaceholders.forEach(p => p.remove());
+		}
+
 		container.innerHTML = '';
 
 		let markersToShow = this.isFilterActive ? this.filteredMarkers : this.markers;
 		markersToShow = this.sortMarkers(markersToShow);
+
+		// Сохраняем отсортированные метки для экспорта в соответствии с видимым порядком
+		if (this.isFilterActive) {
+			this.sortedFilteredMarkers = markersToShow;
+		} else {
+			this.sortedMarkers = markersToShow;
+		}
 
 		if (this.isFilterActive && markersToShow.length === 0) {
 			container.innerHTML = `<div class="no-results">Метки по заданным критериям не найдены</div>`;
@@ -2290,6 +3323,8 @@ class DayZMap {
 			markersToShow.forEach(markerData => {
 				const item = document.createElement('div');
 				item.className = `marker-item marker-${markerData.type}`;
+				item.draggable = true;
+				item.dataset.markerId = markerData.id;
 				item.innerHTML = `
 					<div>
 						<strong>${markerData.text || 'Без названия'}</strong>
@@ -2310,7 +3345,7 @@ class DayZMap {
 				});
 
 				item.addEventListener('click', (e) => {
-					if (!e.target.classList.contains('delete')) {
+					if (!e.target.classList.contains('delete') && !this.isDragging) {
 						this.map.setView(markerData.leafletLatLng);
 						this.highlightMarker(markerData);
 						markerData.marker.openPopup();
@@ -2319,12 +3354,237 @@ class DayZMap {
 
 				container.appendChild(item);
 			});
+
+			// Добавляем обработчики drag-and-drop
+			this.addDragAndDropHandlers(container);
 		}
 
 		this.updateMarkersCounter();
 		this.updateSearchButtons();
 	}
-	
+
+	// Метод для добавления custom drag-and-drop handlers с placeholder
+	addDragAndDropHandlers(container) {
+		// Если уже идет drag или обработчик уже добавлен, не добавляем новые
+		if (this.isDragging || this.dragHandlerAdded) return;
+
+		this.dragHandlerAdded = true;
+
+		// Переменные для отслеживания кликов
+		this.clickCount = 0;
+		this.lastClickTime = 0;
+
+		container.addEventListener('mousedown', (e) => {
+			const markerItem = e.target.closest('.marker-item');
+			if (markerItem && !e.target.closest('.delete')) { // Не начинать drag при клике на delete
+				this.draggedElement = markerItem;
+				this.originalIndex = Array.from(container.children).indexOf(this.draggedElement);
+				this.startX = e.clientX;
+				this.startY = e.clientY;
+				this.dragStarted = false;
+
+				// Добавляем глобальные обработчики
+				document.addEventListener('mousemove', onMouseMove);
+				document.addEventListener('mouseup', onMouseUp);
+			}
+		});
+
+
+
+		const onMouseMove = (e) => {
+			if (!this.draggedElement) return;
+
+			// Проверяем, нажата ли левая кнопка мыши (предотвращаем drag после отпускания)
+			if (e.buttons !== 1) return;
+
+			// Проверяем, начался ли drag
+			const deltaX = Math.abs(e.clientX - this.startX);
+			const deltaY = Math.abs(e.clientY - this.startY);
+
+			if (!this.dragStarted && (deltaX > this.dragThreshold || deltaY > this.dragThreshold)) {
+				// Начинаем drag
+				this.dragStarted = true;
+				this.isDragging = true;
+
+				// Сохраняем позицию курсора относительно элемента
+				const rect = this.draggedElement.getBoundingClientRect();
+				this.dragOffsetX = e.clientX - rect.left;
+				this.dragOffsetY = e.clientY - rect.top;
+
+				// Скрываем оригинальный элемент, удаляя из DOM
+				container.removeChild(this.draggedElement);
+
+				// Создаем clone для визуального перемещения
+				this.draggedClone = this.draggedElement.cloneNode(true);
+				this.draggedClone.style.position = 'fixed';
+				this.draggedClone.style.left = rect.left + 'px';
+				this.draggedClone.style.top = rect.top + 'px';
+				this.draggedClone.style.zIndex = '1000';
+				this.draggedClone.style.pointerEvents = 'none';
+				this.draggedClone.style.width = rect.width + 'px';
+				document.body.appendChild(this.draggedClone);
+
+				// Создаем placeholder
+				this.placeholder = document.createElement('div');
+				this.placeholder.className = 'marker-item drag-placeholder';
+				this.placeholder.style.height = rect.height + 'px'; // Используем rect.height
+				this.placeholder.style.background = 'rgba(52, 152, 219, 0.3)';
+				this.placeholder.style.border = '2px dashed #3498db';
+				this.placeholder.style.display = 'block';
+				this.placeholder.innerHTML = '&nbsp;';
+				// Вставляем placeholder на позицию draggedElement
+				container.insertBefore(this.placeholder, container.children[this.originalIndex]);
+				this.lastInsertIndex = this.originalIndex;
+			}
+
+			if (!this.dragStarted || !this.draggedClone || !this.placeholder) return;
+
+			// Предотвращаем выделение текста во время drag
+			e.preventDefault();
+
+			// Перемещаем clone за курсором
+			const newLeft = e.clientX - this.dragOffsetX;
+			const newTop = e.clientY - this.dragOffsetY;
+			this.draggedClone.style.left = newLeft + 'px';
+			this.draggedClone.style.top = newTop + 'px';
+
+			// Определяем позицию для placeholder
+			const containerRect = container.getBoundingClientRect();
+			const mouseY = e.clientY - containerRect.top + container.scrollTop;
+
+			let insertIndex = 0;
+			const items = Array.from(container.children).filter(item => item !== this.placeholder);
+
+			for (let i = 0; i < items.length; i++) {
+				const itemRect = items[i].getBoundingClientRect();
+				const itemTop = itemRect.top - containerRect.top + container.scrollTop;
+				const itemCenterY = itemTop + itemRect.height / 2;
+
+				if (mouseY < itemCenterY) {
+					insertIndex = i;
+					break;
+				}
+				insertIndex = i + 1;
+			}
+
+			// Перемещаем placeholder только если позиция изменилась
+			if (insertIndex !== this.lastInsertIndex) {
+				if (insertIndex < items.length) {
+					container.insertBefore(this.placeholder, items[insertIndex]);
+				} else {
+					container.appendChild(this.placeholder);
+				}
+				this.lastInsertIndex = insertIndex;
+			}
+		};
+
+		const onMouseUp = (e) => {
+			if (!this.draggedElement) return;
+
+			if (this.dragStarted) {
+				// Завершаем drag
+				// Удаляем clone
+				if (this.draggedClone && this.draggedClone.parentNode) {
+					this.draggedClone.parentNode.removeChild(this.draggedClone);
+				}
+				this.draggedClone = null;
+
+				// Определяем новый индекс по позиции placeholder
+				const currentIndex = Array.from(container.children).indexOf(this.placeholder);
+
+				// Заменяем placeholder на draggedElement
+				container.replaceChild(this.draggedElement, this.placeholder);
+				this.placeholder = null;
+
+				// Если позиция изменилась, переупорядочиваем
+				if (this.originalIndex !== currentIndex) {
+					this.reorderMarkersByIndex(this.originalIndex, currentIndex);
+					this.updateMarkersList();
+				}
+			} else {
+				// Просто клик, без drag, вставляем элемент обратно если нужно
+				if (this.draggedElement.parentNode !== container) {
+					container.insertBefore(this.draggedElement, container.children[this.originalIndex]);
+				}
+			}
+
+			this.draggedElement = null;
+			this.originalIndex = -1;
+			this.dragStarted = false;
+			this.isDragging = false;
+			this.lastInsertIndex = -1;
+
+			// Удаляем глобальные обработчики
+			document.removeEventListener('mousemove', onMouseMove);
+			document.removeEventListener('mouseup', onMouseUp);
+		};
+	}
+
+	// Метод для изменения порядка меток
+	reorderMarkers(draggedId, targetId, insertBefore) {
+		const draggedIndex = this.markers.findIndex(m => m.id.toString() === draggedId);
+		const targetIndex = this.markers.findIndex(m => m.id.toString() === targetId);
+
+		if (draggedIndex === -1 || targetIndex === -1) return;
+
+		const draggedMarker = this.markers.splice(draggedIndex, 1)[0];
+		let newPosition = targetIndex;
+
+		if (!insertBefore && draggedIndex < targetIndex) {
+			newPosition = targetIndex;
+		} else if (insertBefore && draggedIndex > targetIndex) {
+			newPosition = targetIndex;
+		} else if (!insertBefore && draggedIndex > targetIndex) {
+			newPosition = targetIndex + 1;
+		}
+
+		this.markers.splice(newPosition, 0, draggedMarker);
+
+		// Сохраняем изменения
+		this.saveMarkers();
+	}
+
+	// Метод для изменения порядка меток по индексам
+	reorderMarkersByIndex(fromIndex, toIndex) {
+		if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= this.markers.length || toIndex >= this.markers.length) return;
+
+		const draggedMarker = this.markers.splice(fromIndex, 1)[0];
+		this.markers.splice(toIndex, 0, draggedMarker);
+
+		// Сохраняем изменения
+		this.saveMarkers();
+	}
+
+	// Метод для обработки клика по элементу списка меток
+	handleMarkerItemClick(markerItem) {
+		const markerId = parseInt(markerItem.dataset.markerId);
+		const markerData = this.markers.find(m => m.id === markerId);
+
+		if (markerData) {
+			// Центрируем карту на метке
+			this.map.setView(markerData.leafletLatLng);
+			// Выделяем метку
+			this.highlightMarker(markerData);
+			// Открываем popup
+			markerData.marker.openPopup();
+		}
+	}
+
+	// Метод для обработки двойного клика по элементу списка меток
+	handleMarkerItemDblClick(markerItem) {
+		const markerId = parseInt(markerItem.dataset.markerId);
+		const markerData = this.markers.find(m => m.id === markerId);
+
+		if (markerData) {
+			// Центрируем карту на метке с зумом 8
+			this.map.setView(markerData.leafletLatLng, 8);
+			// Выделяем метку
+			this.highlightMarker(markerData);
+			// Открываем popup
+			markerData.marker.openPopup();
+		}
+	}
+
 	// Добавьте метод для подсветки метки при выборе
 	highlightMarker(markerData) {
 		// Временно добавляем класс для подсветки (без анимации)
@@ -2414,6 +3674,13 @@ class DayZMap {
 	}
 	
 	saveMarkers() {
+		// Если есть менеджер профилей, сохраняем через него
+		if (this.profilesManager) {
+			this.profilesManager.saveCurrentProfile();
+			return;
+		}
+
+		// Fallback для старой системы сохранения
         const data = {
             markers: this.markers.map(m => ({
                 id: m.id,
@@ -2507,6 +3774,14 @@ class DayZMap {
     }
 
     loadMarkers() {
+		// Если есть менеджер профилей, загружаем через него
+		if (this.profilesManager) {
+			console.log('Загрузка меток через менеджер профилей...');
+			// Менеджер профилей автоматически загрузит текущий профиль при инициализации
+			return;
+		}
+
+		// Fallback для старой системы загрузки
 		const saved = localStorage.getItem('dayzMapData');
 		if (saved) {
 			try {
@@ -2550,11 +3825,19 @@ class DayZMap {
 
 						const marker = L.marker(leafletLatLng, { icon: icon });
 
+						// Добавляем double-click обработчик ДО привязки popup
+						marker.on('dblclick', (e) => {
+							e.originalEvent.preventDefault();
+							e.originalEvent.stopPropagation();
+							this.editMarker(markerData);
+						});
+
 						marker.bindPopup(`
 							<div class="marker-popup">
 								<strong>${savedMarkerData.text}</strong><br>
 								Тип: ${this.getMarkerTypeName(savedMarkerData.type)}<br>
-								Координаты: X:${savedMarkerData.gameCoords.x} Y:${savedMarkerData.gameCoords.y}${savedMarkerData.gameCoords.z ? ` Z:${savedMarkerData.gameCoords.z}` : ''}
+								Координаты: X:${savedMarkerData.gameCoords.x} Y:${savedMarkerData.gameCoords.y} Z:${savedMarkerData.gameCoords.z || 0}<br>
+								&lt;${savedMarkerData.gameCoords.x} ${savedMarkerData.gameCoords.z || 0} ${savedMarkerData.gameCoords.y}&gt; ${savedMarkerData.gameCoords.degree || 0} Degree <button style="font-size: 12px; padding: 2px 4px; margin-left: 5px; border: none; background: none; cursor: pointer;" onclick="navigator.clipboard.writeText('&lt;${savedMarkerData.gameCoords.x} ${savedMarkerData.gameCoords.z || 0} ${savedMarkerData.gameCoords.y}&gt; ${savedMarkerData.gameCoords.degree || 0} Degree')">📋</button>
 							</div>
 						`);
 
@@ -2582,10 +3865,6 @@ class DayZMap {
 								z: savedMarkerData.gameCoords.z || 0
 							}
 						};
-
-						marker.on('dblclick', () => {
-							this.editMarker(markerData);
-						});
 
 						this.markers.push(markerData);
 					});
@@ -2757,10 +4036,10 @@ class DayZMap {
 			return;
 		}
 		
-		// Показываем детали если есть история
+			// Показываем детали если есть история
 		if (details) {
 			details.style.display = 'block';
-			// Оставляем детали в текущем состоянии
+			details.open = false; // Всегда сворачиваем по умолчанию
 		}
 		
 		// Добавляем элементы для каждого записи в истории
@@ -2834,8 +4113,8 @@ class DayZMap {
                 return this.markers.some(existingMarker => {
                     const sameName = existingMarker.text === markerName;
                     const samePosition = 
-                        existingMarker.gameCoords.x === Math.round(x) && 
-                        existingMarker.gameCoords.y === Math.round(y);
+                        existingMarker.gameCoords.x === x && 
+                        existingMarker.gameCoords.y === y;
                     return sameName && samePosition;
                 });
             };
@@ -2892,18 +4171,26 @@ class DayZMap {
                             const leafletY = (y / CONFIG.mapPixelHeight) * 32;
                             const leafletLatLng = L.latLng(leafletY, leafletX);
 
-                            const gameCoords = { x: Math.round(x), y: Math.round(y), z: z };
+                            const gameCoords = { x: x, y: y, z: z };
 
                             // Создаем метку с глобальной прозрачностью
                             const icon = this.createMarkerIcon(markerType, markerColor, 1.0);
 
                             const markerObj = L.marker(leafletLatLng, { icon: icon });
 
+                            // Добавляем double-click обработчик ДО привязки popup
+                            markerObj.on('dblclick', (e) => {
+                                e.originalEvent.preventDefault();
+                                e.originalEvent.stopPropagation();
+                                this.editMarker(markerData);
+                            });
+
                             markerObj.bindPopup(`
                                 <div class="marker-popup">
                                     <strong>${markerName || 'Без названия'}</strong><br>
                                     Тип: ${this.getMarkerTypeName(markerType)}<br>
-                                    Координаты: X:${gameCoords.x} Y:${gameCoords.y} Z:${z}
+                                    Координаты: X:${gameCoords.x} Y:${gameCoords.y} Z:${z}<br>
+                                    &lt;${gameCoords.x} ${z} ${gameCoords.y}&gt; ${gameCoords.degree || 0} Degree <button style="font-size: 12px; padding: 2px 4px; margin-left: 5px; border: none; background: none; cursor: pointer;" onclick="navigator.clipboard.writeText('&lt;${gameCoords.x} ${z} ${gameCoords.y}&gt; ${gameCoords.degree || 0} Degree')">📋</button>
                                 </div>
                             `);
 
@@ -2934,8 +4221,8 @@ class DayZMap {
 								id: Date.now() + Math.random(),
 								leafletLatLng: { lat: leafletLatLng.lat, lng: leafletLatLng.lng },
 								gameCoords: { 
-									x: Math.round(x), 
-									y: Math.round(y), 
+									x: x, 
+									y: y, 
 									z: z // Сохраняем Z координату
 								},
 								text: markerName,
@@ -2945,10 +4232,6 @@ class DayZMap {
 								textLabel: textLabel,
 								originalData: originalData // Сохраняем ВСЕ оригинальные данные как есть
 							};
-
-                            markerObj.on('dblclick', () => {
-                                this.editMarker(markerData);
-                            });
 
                             this.markers.push(markerData);
                             importedCount++;
@@ -3175,16 +4458,22 @@ class DayZMap {
 
     // Метод для очистки поиска
     clearSearch() {
+		// Если активна выделенная область, снимаем её
+		if (this.areaSelectionActive) {
+			this.clearAreaSelection();
+			return; // Выходим, clearAreaSelection уже всё очистил
+		}
+		
 		this.searchFilter = '';
 		this.filteredMarkers = [];
 		this.isFilterActive = false;
-		
+
 		// Сбрасываем поля поиска
 		const searchInput = document.getElementById('searchMarkers');
 		const searchType = document.getElementById('searchType');
 		if (searchInput) searchInput.value = '';
 		if (searchType) searchType.value = '';
-		
+
 		// Показываем все метки на карте
 		this.markers.forEach(markerData => {
 			markerData.marker.addTo(this.map);
@@ -3192,7 +4481,7 @@ class DayZMap {
 				markerData.textLabel.addTo(this.map);
 			}
 		});
-		
+
 		this.updateMarkersList();
 		this.updateSearchButtons();
 	}
@@ -3513,10 +4802,12 @@ class DayZMap {
             return;
         }
 
-        const exportData = this.prepareExportData();
+        // Используем порядок массива, учитывая изменения от перетаскивания и сортировки
+        const markersToExport = this.sortedMarkers || this.markers;
+        const exportData = this.prepareExportData(markersToExport);
         this.downloadJSON(exportData, 'PrivateMarkers.json');
-        
-        this.showSuccess(`Экспортировано ${this.markers.length} меток`);
+
+        this.showSuccess(`Экспортировано ${markersToExport.length} меток`);
     }
 	
 	// Метод для экспорта меток с выбором серверов
@@ -3526,14 +4817,16 @@ class DayZMap {
 			return;
 		}
 
-		this.showServerExportModal(this.markers, false);
+		// Используем порядок массива, учитывая изменения от перетаскивания и сортировки
+		const markersToExport = this.sortedMarkers || this.markers;
+		this.showServerExportModal(markersToExport, false);
 	}
 
 	// Метод для выполнения экспорта на выбранные серверы
-	performServerExport(selectedServers) {
+	performServerExport(selectedServers, markersToExport = null) {
 		// Получаем данные для экспорта (используем существующий метод)
-		const markersData = this.prepareExportData();
-		
+		const markersData = this.prepareExportData(markersToExport);
+
 		if (!markersData || !markersData[0] || !markersData[0].param2) {
 			this.showError('Ошибка подготовки данных для экспорта');
 			return;
@@ -3546,12 +4839,13 @@ class DayZMap {
 		}));
 
 		// Формируем имя файла
+		const markersCount = markersToExport ? markersToExport.length : this.markers.length;
 		const filename = `Markers_${selectedServers.length}_servers_${this.formatDate()}.json`;
-		
+
 		// Скачиваем файл
 		this.downloadJSON(exportData, filename);
-		
-		this.showSuccess(`Экспортировано ${this.markers.length} меток на ${selectedServers.length} серверов`);
+
+		this.showSuccess(`Экспортировано ${markersCount} меток на ${selectedServers.length} серверов`);
 	}
 
 	// Вспомогательный метод для форматирования даты
@@ -3943,10 +5237,10 @@ class DayZMap {
 			
 			// Преобразуем игровые координаты в Leaflet координаты
 			const leafletLatLng = this.gameToLeafletCoords(x, y);
-			
-			// Центрируем карту с зумом 8
-			this.map.setView(leafletLatLng, 8);
-			
+
+			// Центрируем карту с зумом 8 (если текущий зум меньше)
+			this.map.setView(leafletLatLng, this.getCenteringZoom(8));
+
 			// Создаем временный маркер для визуальной индикации
 			this.showTemporaryMarker(leafletLatLng, x, y, z);
 			
@@ -4021,10 +5315,10 @@ class DayZMap {
 			
 			// Преобразуем игровые координаты в Leaflet координаты
 			const leafletLatLng = this.gameToLeafletCoords(x, y);
-			
-			// Центрируем карту с зумом 8
-			this.map.setView(leafletLatLng, 8);
-			
+
+			// Центрируем карту с зумом 8 (если текущий зум меньше)
+			this.map.setView(leafletLatLng, this.getCenteringZoom(8));
+
 			// Создаем объект координат с Z значением
 			const gameCoords = { x: x, y: y, z: z };
 			
@@ -4244,7 +5538,9 @@ class DayZMap {
 			return;
 		}
 
-		this.showServerExportModal(this.filteredMarkers, true);
+		// Используем порядок найденных меток, учитывая изменения от перетаскивания и сортировки
+		const markersToExport = this.sortedFilteredMarkers || this.filteredMarkers;
+		this.showServerExportModal(markersToExport, true);
 	}
 	
 	// Универсальный метод для показа модального окна экспорта на серверы
@@ -4260,7 +5556,7 @@ class DayZMap {
 				<label>Настройки серверов для экспорта:</label>
 				<div class="servers-config">
 					<div class="server-presets">
-						<details>
+						<details open>
 							<summary><strong>Предустановленные серверы YW</strong></summary>
 							<div class="preset-servers" style="margin-top: 10px;">
 								<div class="preset-server" data-ip="109.248.4.32" data-port="2200">chernarus-1 --> 109.248.4.32:2200</div>
@@ -4277,11 +5573,7 @@ class DayZMap {
 							<button type="button" id="addServerBtn" class="small-btn">+ Добавить сервер</button>
 						</div>
 						<div id="customServersList" class="servers-list">
-							<div class="server-input-row">
-								<input type="text" class="server-ip" placeholder="IP адрес" value="109.248.4.32">
-								<input type="text" class="server-port" placeholder="Порт" value="2200">
-								<button type="button" class="remove-server-btn small-btn">×</button>
-							</div>
+							
 						</div>
 						<div class="servers-count">Добавлено серверов: <span id="serversCount">1</span>/20</div>
 					</div>
@@ -4560,7 +5852,7 @@ class DayZMap {
 			<div class="modal-field">
 				<label>Радиус поиска: <span id="radiusValue">${radius}</span>м</label>
 				<div class="radius-control" style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
-					<input type="range" id="radiusSlider" min="50" max="2000" value="${radius}" step="50" style="flex: 1;">
+					<input type="range" id="radiusSlider" min="10" max="2000" value="${radius}" step="10" style="flex: 1;">
 					<button id="updateRadiusBtn" class="small-btn" style="white-space: nowrap;">Применить</button>
 				</div>
 				<div style="display: flex; justify-content: space-between; font-size: 0.8em; color: #95a5a6; margin-top: 5px;">
@@ -5338,18 +6630,614 @@ class DayZMap {
 	// Метод для закрытия всех модальных окон
 	closeAllModals() {
 		console.log('🗑️ Закрываем все модальные окна');
-		
+
 		// Закрываем все модальные окна
 		const allModals = document.querySelectorAll('.marker-modal');
 		allModals.forEach(modal => {
 			this.closeModal(modal);
 		});
-		
+
 		// Убираем оверлей
 		const overlay = document.querySelector('.modal-overlay');
 		if (overlay) {
 			overlay.classList.remove('active');
 		}
+	}
+
+	// Метод для построения маршрута
+	buildRoute() {
+		// Закрываем другие модальные окна
+		this.closeAllModals();
+
+		// Сначала уточняем название метки и тип метки для построения маршрута
+		this.showRouteTypeSelectionModal();
+	}
+
+	// Метод для установки текущего местоположения и построения маршрута
+	setCurrentLocationAndBuildRoute(x, y, z) {
+		const leafletLatLng = this.gameToLeafletCoords(x, y);
+		const gameCoords = { x, y, z };
+
+		// Центрируем карту
+		this.map.setView(leafletLatLng, 8);
+
+		// Добавляем метку текущего положения
+		this.addCurrentLocationMarker(leafletLatLng, gameCoords, this.routeCriteria);
+
+		// Сохраняем позицию для последующих шагов
+		this.routeStartCoords = gameCoords;
+		this.routeStartLeafletLatLng = leafletLatLng;
+
+		// Строим маршрут
+		this.buildStashRoute(gameCoords, this.routeCriteria);
+	}
+
+	// Модальное окно для ввода текущего местоположения
+	showCurrentLocationInputModal() {
+		const content = `
+			<div class="modal-field">
+				<label>Введите ваше текущее местоположение в игре:</label>
+				<input type="text" id="currentLocationInput" placeholder="<X Z Y> Degree" style="width: 100%; padding: 8px; margin-top: 5px;">
+				<div style="font-size: 0.8em; color: #95a5a6; margin-top: 5px;">
+					Откройте карту в игре, нажмите "Копировать координаты" и вставьте сюда
+				</div>
+			</div>
+
+			<div class="modal-buttons">
+				<button id="continueBuildRoute" style="background: #27ae60; color: white;">Продолжить</button>
+				<button id="cancelBuildRoute" style="background: #7f8c8d; color: white;">Отмена</button>
+			</div>
+		`;
+
+		const modal = this.createDraggableModal('Построение маршрута кладов', content);
+
+		// Обработчики кнопок
+		const continueBtn = document.getElementById('continueBuildRoute');
+		const cancelBtn = document.getElementById('cancelBuildRoute');
+		const input = document.getElementById('currentLocationInput');
+
+		if (continueBtn) {
+			continueBtn.addEventListener('click', () => {
+				const coordsString = input.value.trim();
+				if (!coordsString) {
+					this.showError('Введите координаты вашего местоположения');
+					return;
+				}
+
+				try {
+					const { x, y, z } = this.parseDayZCoordinates(coordsString);
+					this.closeModal(modal);
+					this.setCurrentLocationAndBuildRoute(x, y, z);
+				} catch (error) {
+					this.showError(error.message);
+				}
+			});
+		}
+
+		if (cancelBtn) {
+			cancelBtn.addEventListener('click', () => {
+				this.closeModal(modal);
+			});
+		}
+
+		// Enter для ввода
+		if (input) {
+			input.addEventListener('keypress', (e) => {
+				if (e.key === 'Enter') {
+					continueBtn.click();
+				}
+			});
+			// Фокус на поле ввода
+			setTimeout(() => input.focus(), 100);
+		}
+	}
+
+	// Модальное окно для выбора типа метки для маршрута
+	showRouteTypeSelectionModal() {
+		// Создаем HTML для существующих критериев
+		let criteriaHtml = '';
+		if (this.routeCriteria && this.routeCriteria.length > 0) {
+			this.routeCriteria.forEach((criterion, index) => {
+				criteriaHtml += `
+					<div class="route-criterion" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+						<select class="route-marker-type" style="flex: 2; padding: 5px;">
+							${this.getMarkerTypeOptions(criterion.type)}
+						</select>
+						<input type="text" class="route-marker-name" placeholder="Название (опционально)" value="${criterion.name || ''}" style="flex: 2; padding: 5px;">
+						<button type="button" class="remove-criterion-btn" style="background: #e74c3c; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">×</button>
+					</div>
+				`;
+			});
+		} else {
+			// Если критериев нет, показываем один пустой
+			criteriaHtml = `
+				<div class="route-criterion" style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+					<select class="route-marker-type" style="flex: 2; padding: 5px;">
+						${this.getMarkerTypeOptions('')}
+					</select>
+					<input type="text" class="route-marker-name" placeholder="Название (опционально)" style="flex: 2; padding: 5px;">
+					<button type="button" class="remove-criterion-btn" style="background: #e74c3c; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">×</button>
+				</div>
+			`;
+		}
+
+		const content = `
+			<div class="modal-field">
+				<label>Добавьте критерии для построения маршрута:</label>
+				<div style="font-size: 0.9em; color: #95a5a6; margin-top: 5px; margin-bottom: 10px;">
+					Маршрут будет построен до всех меток, соответствующих хотя бы одному критерию (ИЛИ).<br>
+					Вы можете добавить несколько критериев с разными типами меток.
+				</div>
+				<div id="routeCriteriaContainer" style="max-height: 300px; overflow-y: auto; border: 1px solid #555; padding: 10px; margin-bottom: 10px;">
+					${criteriaHtml}
+				</div>
+				<button type="button" id="addCriterionBtn" style="background: #3498db; color: white; border: none; padding: 8px 15px; border-radius: 3px; cursor: pointer; width: 100%;">+ Добавить критерий</button>
+			</div>
+
+			<div class="modal-buttons">
+				<button id="continueWithSelection" style="background: #27ae60; color: white;">Продолжить</button>
+				<button id="cancelSelection" style="background: #7f8c8d; color: white;">Отмена</button>
+			</div>
+		`;
+
+		const modal = this.createDraggableModal('Выбор критериев для маршрута', content, () => {
+			// При закрытии убираем временный маркер
+			this.removeTemporaryAddMarker();
+		});
+
+		// Инициализация функционала критериев
+		this.initRouteCriteria(modal);
+
+		// Обработчики кнопок
+		const continueBtn = document.getElementById('continueWithSelection');
+		const cancelBtn = document.getElementById('cancelSelection');
+
+		if (continueBtn) {
+			continueBtn.addEventListener('click', () => {
+				// Собираем все критерии
+				const criteria = this.getRouteCriteriaFromForm();
+				if (criteria.length === 0) {
+					this.showError('Добавьте хотя бы один критерий');
+					return;
+				}
+
+				// Сохраняем критерии
+				this.routeCriteria = criteria;
+
+				this.closeModal(modal);
+				// Показываем окно ввода текущего местоположения
+				this.showCurrentLocationInputModal();
+			});
+		}
+
+		if (cancelBtn) {
+			cancelBtn.addEventListener('click', () => {
+				this.closeModal(modal);
+			});
+		}
+
+		return modal;
+	}
+
+	// Инициализация функционала критериев маршрута
+	initRouteCriteria(modal) {
+		const container = document.getElementById('routeCriteriaContainer');
+		const addBtn = document.getElementById('addCriterionBtn');
+
+		// Обработчик добавления критерия
+		if (addBtn) {
+			addBtn.addEventListener('click', () => {
+				this.addRouteCriterion(container);
+			});
+		}
+
+		// Обработчик удаления критериев (делегирование)
+		if (container) {
+			container.addEventListener('click', (e) => {
+				if (e.target.classList.contains('remove-criterion-btn')) {
+					const criterionDiv = e.target.closest('.route-criterion');
+					if (criterionDiv) {
+						criterionDiv.remove();
+						this.updateRemoveButtons(container);
+					}
+				}
+			});
+		}
+
+		// Инициализация состояния кнопок удаления
+		this.updateRemoveButtons(container);
+	}
+
+	// Добавление нового критерия
+	addRouteCriterion(container) {
+		const criterionDiv = document.createElement('div');
+		criterionDiv.className = 'route-criterion';
+		criterionDiv.style.cssText = 'display: flex; align-items: center; gap: 10px; margin-bottom: 10px;';
+
+		criterionDiv.innerHTML = `
+			<select class="route-marker-type" style="flex: 2; padding: 5px;">
+				${this.getMarkerTypeOptions('skull')}
+			</select>
+			<input type="text" class="route-marker-name" placeholder="Название (опционально)" style="flex: 2; padding: 5px;">
+			<button type="button" class="remove-criterion-btn" style="background: #e74c3c; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">×</button>
+		`;
+
+		container.appendChild(criterionDiv);
+		this.updateRemoveButtons(container);
+	}
+
+	// Обновление состояния кнопок удаления
+	updateRemoveButtons(container) {
+		const criteria = container.querySelectorAll('.route-criterion');
+		const removeButtons = container.querySelectorAll('.remove-criterion-btn');
+
+		// Если только один критерий, скрываем кнопку удаления
+		if (criteria.length === 1) {
+			removeButtons.forEach(btn => btn.style.display = 'none');
+		} else {
+			removeButtons.forEach(btn => btn.style.display = 'block');
+		}
+	}
+
+	// Получение критериев из формы
+	getRouteCriteriaFromForm() {
+		const criteria = [];
+		const criterionDivs = document.querySelectorAll('.route-criterion');
+
+		criterionDivs.forEach(div => {
+			const typeSelect = div.querySelector('.route-marker-type');
+			const nameInput = div.querySelector('.route-marker-name');
+
+			if (typeSelect && nameInput) {
+				const type = typeSelect.value;
+				const name = nameInput.value.trim();
+
+				if (type) {
+					criteria.push({ type, name });
+				}
+			}
+		});
+
+		return criteria;
+	}
+
+	// Модальное окно для подтверждения текущего местоположения
+	showCurrentLocationModal(leafletLatLng, gameCoords) {
+		const content = `
+			<div class="modal-field">
+				<label>Подтвердите ваше текущее местоположение:</label>
+				<div class="coordinates-display">
+					<strong>Координаты:</strong><br>
+					X: ${gameCoords.x}<br>
+					Y: ${gameCoords.y}<br>
+					Z: ${gameCoords.z}
+				</div>
+				<div style="font-size: 0.9em; color: #95a5a6; margin-top: 10px;">
+					На карте показан красный пульсирующий маркер. Это ваше положение?
+				</div>
+			</div>
+
+			<div class="modal-buttons">
+				<button id="confirmLocation" style="background: #27ae60; color: white;">Да, это мое положение</button>
+				<button id="changeLocation" style="background: #f39c12; color: white;">Изменить координаты</button>
+				<button id="cancelLocation" style="background: #7f8c8d; color: white;">Отмена</button>
+			</div>
+		`;
+
+		const modal = this.createDraggableModal('Подтверждение местоположения', content, () => {
+			// При закрытии убираем временный маркер
+			this.removeTemporaryAddMarker();
+		});
+
+		// Обработчики кнопок
+		const confirmBtn = document.getElementById('confirmLocation');
+		const changeBtn = document.getElementById('changeLocation');
+		const cancelBtn = document.getElementById('cancelLocation');
+
+		if (confirmBtn) {
+			confirmBtn.addEventListener('click', () => {
+				this.closeModal(modal);
+				// Добавляем метку текущего положения
+				this.addCurrentLocationMarker(leafletLatLng, gameCoords, this.routeCriteria);
+			});
+		}
+
+		if (changeBtn) {
+			changeBtn.addEventListener('click', () => {
+				this.closeModal(modal);
+				// Возвращаемся к вводу координат (тип и название уже выбраны)
+				this.showCurrentLocationInputModal();
+			});
+		}
+
+		if (cancelBtn) {
+			cancelBtn.addEventListener('click', () => {
+				this.closeModal(modal);
+			});
+		}
+	}
+
+	// Добавление метки текущего положения и построение маршрута
+	addCurrentLocationMarker(leafletLatLng, gameCoords, routeCriteria) {
+		// Создаем метку текущего положения
+		const icon = this.createMarkerIcon('player', '#9b59b6', 1.0); // Используем тип player для текущего положения
+		const marker = L.marker(leafletLatLng, { icon });
+
+		const textLabel = L.marker(leafletLatLng, {
+			icon: this.createTextLabel('Текущее положение', '#9b59b6', 1.0),
+			interactive: false
+		});
+
+		// Добавляем на карту
+		marker.addTo(this.map);
+		textLabel.addTo(this.map);
+
+		marker.bindPopup(`
+			<div class="marker-popup">
+				<strong>Текущее положение</strong><br>
+				Тип: Игрок<br>
+				Координаты: X:${gameCoords.x} Y:${gameCoords.y} Z:${gameCoords.z}<br>
+			</div>
+		`);
+
+		// Добавляем в массив меток как обычную метку
+		const markerData = {
+			id: parseInt(Date.now().toString().slice(0, 10)),
+			leafletLatLng: { lat: leafletLatLng.lat, lng: leafletLatLng.lng },
+			gameCoords: { x: gameCoords.x, y: gameCoords.y, z: gameCoords.z },
+			text: 'Текущее положение',
+			type: 'player',
+			color: '#9b59b6',
+			marker: marker,
+			textLabel: textLabel
+		};
+
+		this.markers.push(markerData);
+		this.saveMarkers();
+
+		// Сохраняем ссылку для маршрута
+		this.currentLocationMarker = markerData;
+
+		// Теперь строим маршрут
+		this.buildStashRoute(gameCoords, routeCriteria);
+	}
+
+	// Построение маршрута до меток по критериям
+	buildStashRoute(currentCoords, criteria, markerName) {
+		// Поддержка старого формата вызовов: (currentCoords, markerType, markerName)
+		let routeCriteria = [];
+		if (typeof criteria === 'string') {
+			// Старый формат: criteria - это markerType, markerName - это markerName
+			const markerType = criteria;
+			routeCriteria = [{ type: markerType, name: markerName }];
+		} else if (Array.isArray(criteria)) {
+			// Новый формат: criteria - это массив объектов {type, name}
+			routeCriteria = criteria;
+		} else {
+			// Если criteria - объект, преобразуем в массив
+			routeCriteria = [criteria];
+		}
+
+		// Собираем метки по всем критериям (ИЛИ логика)
+		let targetMarkers = [];
+
+		routeCriteria.forEach(criterion => {
+			let matchingMarkers = this.markers.filter(m => m.type === criterion.type);
+
+			// Если указано название, фильтруем по нему
+			if (criterion.name) {
+				matchingMarkers = matchingMarkers.filter(m =>
+					m.text && m.text.toLowerCase().includes(criterion.name.toLowerCase())
+				);
+			}
+
+			// Добавляем найденные метки, избегая дубликатов
+			matchingMarkers.forEach(marker => {
+				if (!targetMarkers.some(tm => tm.id === marker.id)) {
+					targetMarkers.push(marker);
+				}
+			});
+		});
+
+		if (targetMarkers.length === 0) {
+			const criteriaDescriptions = criteria.map(c => {
+				const typeName = this.getMarkerTypeName(c.type);
+				return c.name ? `"${typeName}" с названием "${c.name}"` : `"${typeName}"`;
+			}).join(', ');
+			this.showError(`Не найдено меток по заданным критериям: ${criteriaDescriptions}`);
+			return;
+		}
+
+		// Создаем массив точек: текущая позиция + все целевые метки
+		const points = [currentCoords, ...targetMarkers.map(m => m.gameCoords)];
+
+		// Строим оптимальный маршрут (ближайший сосед)
+		const route = this.calculateOptimalRoute(points);
+
+		// Отображаем маршрут на карте
+		this.displayRoute(route);
+
+		// Формируем сообщение о результате
+		const criteriaDescriptions = criteria.map(c => {
+			const typeName = this.getMarkerTypeName(c.type);
+			return c.name ? `"${typeName}" с названием "${c.name}"` : `"${typeName}"`;
+		}).join(', ');
+
+		this.showSuccess(`Маршрут построен! ${targetMarkers.length} меток по критериям: ${criteriaDescriptions}, общее расстояние: ${this.calculateRouteDistance(route)}м`);
+	}
+
+	// Алгоритм ближайшего соседа для TSP аппроксимации с 2-opt оптимизацией
+	calculateOptimalRoute(points) {
+		if (points.length <= 1) return points;
+
+		const route = [points[0]]; // Начинаем с текущего положения
+		const remaining = points.slice(1);
+		let current = points[0];
+
+		while (remaining.length > 0) {
+			// Находим ближайшую точку
+			let nearestIndex = 0;
+			let minDistance = this.calculateDistance(current.x, current.y, remaining[0].x, remaining[0].y);
+
+			for (let i = 1; i < remaining.length; i++) {
+				const distance = this.calculateDistance(current.x, current.y, remaining[i].x, remaining[i].y);
+				if (distance < minDistance) {
+					minDistance = distance;
+					nearestIndex = i;
+				}
+			}
+
+			// Добавляем ближайшую точку в маршрут
+			const nextPoint = remaining.splice(nearestIndex, 1)[0];
+			route.push(nextPoint);
+			current = nextPoint;
+		}
+
+		// Применяем 2-opt оптимизацию
+		return this.twoOptOptimization(route);
+	}
+
+	// 2-opt локальная оптимизация маршрута
+	twoOptOptimization(route) {
+		if (route.length < 4) return route; // 2-opt нужен минимум для 4 точек
+
+		let improved = true;
+		let currentRoute = [...route];
+		let iterations = 0;
+		const maxIterations = 1000; // Предотвращаем бесконечный цикл
+
+		while (improved && iterations < maxIterations) {
+			improved = false;
+			iterations++;
+
+			for (let i = 1; i < currentRoute.length - 1; i++) {
+				for (let j = i + 1; j < currentRoute.length; j++) {
+					// Вычисляем новую длину после переворота сегмента i..j
+					const newRoute = this.twoOptSwap(currentRoute, i, j);
+					const currentDistance = this.calculateRouteDistance(currentRoute);
+					const newDistance = this.calculateRouteDistance(newRoute);
+
+					// Если новый маршрут короче, принимаем его
+					if (newDistance < currentDistance) {
+						currentRoute = newRoute;
+						improved = true;
+						break; // Начинаем заново с первой пары
+					}
+				}
+				if (improved) break;
+			}
+		}
+
+		console.log(`2-opt завершен за ${iterations} итераций`);
+		return currentRoute;
+	}
+
+	// Выполняет 2-opt swap: переворачивает сегмент между i и j
+	twoOptSwap(route, i, j) {
+		const newRoute = [...route];
+
+		// Переворачиваем сегмент от i до j
+		let left = i;
+		let right = j;
+
+		while (left < right) {
+			[newRoute[left], newRoute[right]] = [newRoute[right], newRoute[left]];
+			left++;
+			right--;
+		}
+
+		return newRoute;
+	}
+
+	// Отображение маршрута на карте
+	displayRoute(route) {
+		// Удаляем предыдущий маршрут если есть
+		if (this.routeLayer) {
+			this.map.removeLayer(this.routeLayer);
+		}
+		if (this.routeMarkers) {
+			this.routeMarkers.forEach(marker => this.map.removeLayer(marker));
+		}
+
+		// Создаем массив точек для Leaflet
+		const leafletPoints = route.map(point => this.gameToLeafletCoords(point.x, point.y));
+
+		// Рисуем линию маршрута
+		this.routeLayer = L.polyline(leafletPoints, {
+			color: '#e74c3c',
+			weight: 4,
+			opacity: 0.8,
+			dashArray: '10, 10'
+		}).addTo(this.map);
+
+		// Добавляем маркеры с номерами порядка
+		this.routeMarkers = [];
+		route.forEach((point, index) => {
+			const icon = L.divIcon({
+				className: 'route-number-marker',
+				html: `<div style="
+					background: #e74c3c;
+					color: white;
+					width: 24px;
+					height: 24px;
+					border-radius: 50%;
+					display: flex;
+					align-items: center;
+					justify-content: center;
+					font-weight: bold;
+					font-size: 12px;
+					border: 2px solid white;
+					box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+				">${index + 1}</div>`,
+				iconSize: [24, 24],
+				iconAnchor: [12, 12]
+			});
+
+			const marker = L.marker(leafletPoints[index], { icon });
+			marker.bindPopup(`
+				<div class="route-popup">
+					<strong>${index === 0 ? 'Старт' : 'Точка ' + index}</strong><br>
+					Координаты: X:${point.x} Y:${point.y}<br>
+					${index > 0 ? `Расстояние от предыдущей точки: ${Math.round(this.calculateDistance(route[index-1].x, route[index-1].y, point.x, point.y))}м` : ''}
+				</div>
+			`);
+			marker.addTo(this.map);
+			this.routeMarkers.push(marker);
+		});
+
+		// Центрируем карту чтобы показать весь маршрут
+		const bounds = L.latLngBounds(leafletPoints);
+		this.map.fitBounds(bounds, { padding: [20, 20] });
+	}
+
+	// Расчет общего расстояния маршрута
+	calculateRouteDistance(route) {
+		let totalDistance = 0;
+		for (let i = 1; i < route.length; i++) {
+			totalDistance += this.calculateDistance(route[i-1].x, route[i-1].y, route[i].x, route[i].y);
+		}
+		return Math.round(totalDistance);
+	}
+
+	// Очистка маршрута
+	clearRoute() {
+		if (this.routeLayer) {
+			this.map.removeLayer(this.routeLayer);
+			this.routeLayer = null;
+		}
+
+		if (this.routeMarkers) {
+			this.routeMarkers.forEach(marker => this.map.removeLayer(marker));
+			this.routeMarkers = null;
+		}
+
+		// Удаляем метку текущего положения если она была создана для маршрута
+		if (this.currentLocationMarker) {
+			this.removeMarker(this.currentLocationMarker.id);
+			this.currentLocationMarker = null;
+		}
+
+		this.showSuccess('Маршрут очищен');
 	}
 	
 	getSearchPrefixes() {
@@ -5542,12 +7430,317 @@ class DayZMap {
 		}
 	}
 
+	// ========== ВЫДЕЛЕНИЕ ОБЛАСТИ ==========
+	
+	/**
+	 * Переключение режима выделения области
+	 */
+	toggleAreaSelectionMode() {
+		this.areaSelectionMode = !this.areaSelectionMode;
+		
+		if (this.areaSelectionMode) {
+			this.startAreaSelection();
+		} else {
+			this.cancelAreaSelection();
+		}
+	}
+	
+	/**
+	 * Начало режима выделения области
+	 */
+	startAreaSelection() {
+		this.areaSelectionPoints = [];
+		this.map.getContainer().classList.add('area-selection-mode-active');
+		
+		// Создаем подсказку
+		if (!this.areaSelectionHint) {
+			this.areaSelectionHint = document.createElement('div');
+			this.areaSelectionHint.className = 'area-selection-hint';
+			document.body.appendChild(this.areaSelectionHint);
+		}
+		this.updateAreaSelectionHint();
+		
+		// Добавляем обработчик клика по карте
+		this.map.on('click', this.handleAreaSelectionClick, this);
+		
+		// Добавляем обработчик движения мыши для динамического полигона
+		this.map.on('mousemove', this.handleAreaSelectionMouseMove, this);
+		
+		// Добавляем обработчик нажатия клавиш (используем bind для сохранения контекста)
+		this._boundKeydownHandler = this.handleAreaSelectionKeydown.bind(this);
+		document.addEventListener('keydown', this._boundKeydownHandler);
+		
+		this.showSuccess('Режим выделения и поиска в области включен. Кликайте для добавления точек. Enter - завершить, Escape - отменить.');
+	}
+	
+	/**
+	 * Отмена режима выделения области
+	 */
+	cancelAreaSelection() {
+		this.areaSelectionPoints = [];
+		
+		if (this.areaSelectionPolygon) {
+			this.map.removeLayer(this.areaSelectionPolygon);
+			this.areaSelectionPolygon = null;
+		}
+		
+		this.map.getContainer().classList.remove('area-selection-mode-active');
+		
+		if (this.areaSelectionHint) {
+			this.areaSelectionHint.classList.add('hidden');
+		}
+		
+		// Удаляем обработчики
+		this.map.off('click', this.handleAreaSelectionClick, this);
+		this.map.off('mousemove', this.handleAreaSelectionMouseMove, this);
+		document.removeEventListener('keydown', this._boundKeydownHandler);
+		this._boundKeydownHandler = null;
+		
+		this.areaSelectionMode = false;
+	}
+	
+	/**
+	 * Обновление подсказки
+	 */
+	updateAreaSelectionHint() {
+		if (!this.areaSelectionHint) return;
+		
+		const pointsCount = this.areaSelectionPoints.length;
+		if (pointsCount === 0) {
+			this.areaSelectionHint.textContent = 'Кликните для добавления первой точки';
+		} else if (pointsCount === 1) {
+			this.areaSelectionHint.textContent = 'Кликните для добавления второй точки (Enter - завершить, Escape - отменить)';
+		} else {
+			this.areaSelectionHint.textContent = `Добавлено точек: ${pointsCount}. Enter - завершить выделение, Escape - отменить.`;
+		}
+		this.areaSelectionHint.classList.remove('hidden');
+	}
+	
+	/**
+	 * Обработчик клика для добавления точки
+	 */
+	handleAreaSelectionClick(e) {
+		this.areaSelectionPoints.push(e.latlng);
+		this.updateAreaSelectionHint();
+		
+		// Если это первая точка, создаем полигон
+		if (this.areaSelectionPoints.length === 1) {
+			if (this.areaSelectionPolygon) {
+				this.map.removeLayer(this.areaSelectionPolygon);
+			}
+			this.areaSelectionPolygon = L.polygon(this.areaSelectionPoints, {
+				color: '#3498db',
+				dashArray: '5, 5',
+				fillColor: '#3498db',
+				fillOpacity: 0.2,
+				weight: 2
+			}).addTo(this.map);
+		} else {
+			// Обновляем полигон с замыканием на первую точку для визуализации
+			const closedPoints = [...this.areaSelectionPoints, this.areaSelectionPoints[0]];
+			this.areaSelectionPolygon.setLatLngs(closedPoints);
+		}
+	}
+	
+	/**
+	 * Обработчик движения мыши для динамического отображения
+	 */
+	handleAreaSelectionMouseMove(e) {
+		if (this.areaSelectionPoints.length === 0) return;
+		
+		// Создаем временные точки для отображения "резинового" полигона
+		// Замыкаем на первую точку для корректного отображения
+		const tempPoints = [...this.areaSelectionPoints, e.latlng, this.areaSelectionPoints[0]];
+		
+		if (this.areaSelectionPolygon) {
+			this.areaSelectionPolygon.setLatLngs(tempPoints);
+		}
+	}
+	
+	/**
+	 * Обработчик нажатия клавиш для управления выделением
+	 */
+	handleAreaSelectionKeydown(e) {
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			e.stopPropagation();
+			this.finishAreaSelection();
+		} else if (e.key === 'Escape') {
+			e.preventDefault();
+			e.stopPropagation();
+			this.cancelAreaSelection();
+		}
+	}
+	
+	/**
+	 * Завершение выделения и поиск меток в области
+	 */
+	finishAreaSelection() {
+		if (this.areaSelectionPoints.length < 2) {
+			this.showWarning('Добавьте минимум 2 точки для выделения области');
+			return;
+		}
+		
+		// Удаляем обработчики
+		this.map.off('click', this.handleAreaSelectionClick, this);
+		this.map.off('mousemove', this.handleAreaSelectionMouseMove, this);
+		document.removeEventListener('keydown', this._boundKeydownHandler);
+		this._boundKeydownHandler = null;
+
+		// Удаляем временный полигон
+		if (this.areaSelectionPolygon) {
+			this.map.removeLayer(this.areaSelectionPolygon);
+			this.areaSelectionPolygon = null;
+		}
+
+		// Удаляем подсказку
+		if (this.areaSelectionHint) {
+			this.areaSelectionHint.classList.add('hidden');
+		}
+
+		this.map.getContainer().classList.remove('area-selection-mode-active');
+		this.areaSelectionMode = false;
+
+		// Ищем метки в полигоне (используем замкнутый полигон без последней повторяющейся точки)
+		const selectedMarkers = this.findMarkersInPolygon(this.areaSelectionPoints);
+
+		// Создаем постоянный полигон для отображения выделенной области
+		this.areaSelectionResultPolygon = L.polygon(this.areaSelectionPoints, {
+			color: '#27ae60',
+			dashArray: '5, 5',
+			fillColor: '#27ae60',
+			fillOpacity: 0.3,
+			weight: 2
+		}).addTo(this.map);
+		
+		// Устанавливаем флаг активной выделенной области
+		this.areaSelectionActive = true;
+
+		// Очищаем точки
+		this.areaSelectionPoints = [];
+
+		if (selectedMarkers.length === 0) {
+			this.showInfo('В выделенной области меток не найдено');
+			// Удаляем полигон если меток не найдено
+			setTimeout(() => {
+				if (this.areaSelectionResultPolygon) {
+					this.map.removeLayer(this.areaSelectionResultPolygon);
+					this.areaSelectionResultPolygon = null;
+					this.areaSelectionActive = false;
+				}
+			}, 2000);
+			return;
+		}
+
+		// Активируем режим массового редактирования с найденными метками
+		this.activateBulkEditForMarkers(selectedMarkers);
+
+		this.showSuccess(`Найдено меток: ${selectedMarkers.length}`);
+	}
+	
+	/**
+	 * Поиск меток внутри полигона
+	 */
+	findMarkersInPolygon(polygonPoints) {
+		const foundMarkers = [];
+		
+		this.markers.forEach(markerData => {
+			if (this.pointInPolygon(markerData.leafletLatLng, polygonPoints)) {
+				foundMarkers.push(markerData);
+			}
+		});
+		
+		return foundMarkers;
+	}
+	
+	/**
+	 * Проверка попадания точки в полигон (алгоритм ray casting)
+	 */
+	pointInPolygon(point, polygon) {
+		const x = point.lng;
+		const y = point.lat;
+		
+		let inside = false;
+		for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+			const xi = polygon[i].lng;
+			const yi = polygon[i].lat;
+			const xj = polygon[j].lng;
+			const yj = polygon[j].lat;
+			
+			const intersect = ((yi > y) !== (yj > y)) &&
+				(x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+			
+			if (intersect) inside = !inside;
+		}
+		
+		return inside;
+	}
+	
+	/**
+	 * Активация массового редактирования для указанных меток
+	 */
+	activateBulkEditForMarkers(markers) {
+		// Устанавливаем найденные метки как отфильтрованные
+		this.filteredMarkers = markers;
+		this.isFilterActive = true;
+		this.searchFilter = '(выделенная область)';
+
+		// Обновляем список меток
+		this.updateMarkersList();
+
+		// Показываем кнопки массового редактирования и экспорта
+		const bulkEditBtn = document.getElementById('bulkEditBtn');
+		const exportFilteredBtn = document.getElementById('exportFilteredToServersBtn');
+
+		if (bulkEditBtn) bulkEditBtn.style.display = 'block';
+		if (exportFilteredBtn) exportFilteredBtn.style.display = 'block';
+
+		// Сохраняем информацию о том, что это выделение области
+		this.areaSelectionActive = true;
+		this.areaSelectionMarkers = markers;
+	}
+	
+	/**
+	 * Очистка выделенной области
+	 */
+	clearAreaSelection() {
+		// Удаляем полигон с карты
+		if (this.areaSelectionResultPolygon) {
+			this.map.removeLayer(this.areaSelectionResultPolygon);
+			this.areaSelectionResultPolygon = null;
+		}
+		
+		// Сбрасываем фильтры
+		this.areaSelectionActive = false;
+		this.areaSelectionMarkers = null;
+		this.filteredMarkers = [];
+		this.isFilterActive = false;
+		this.searchFilter = '';
+		
+		// Скрываем кнопки массового редактирования и экспорта
+		const bulkEditBtn = document.getElementById('bulkEditBtn');
+		const exportFilteredBtn = document.getElementById('exportFilteredToServersBtn');
+		
+		if (bulkEditBtn) bulkEditBtn.style.display = 'none';
+		if (exportFilteredBtn) exportFilteredBtn.style.display = 'none';
+		
+		// Обновляем список меток (показываем все)
+		this.updateMarkersList();
+		
+		this.showSuccess('Выделение области снято');
+	}
+
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM загружен, создаем карту...');
     window.dayzMap = new DayZMap();
-    
+
+    // Инициализируем менеджер массового импорта
+    if (typeof BulkImportManager !== 'undefined') {
+        window.dayzMap.bulkImportManager = new BulkImportManager(window.dayzMap);
+    }
+
     // Инициализируем кнопки сортировки после создания карты
     setTimeout(() => {
         if (window.dayzMap) {

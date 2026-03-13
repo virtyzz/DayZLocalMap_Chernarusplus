@@ -192,13 +192,13 @@ window.namesData = [
 {id:'Hill_SvyatoyRoman',name:'Святой Роман',position:[84.832001,11901.246],type:'Hill'},
 {id:'Hill_Koman',name:'Коман',position:[1660.652,7415.6611],type:'Hill'},
 {id:'Hill_Mayak',name:'Маяк',position:[12323.813,4553.1069],type:'Hill'},
-{id:'Local_MB_VMC',name:'военная база',position:[4497,8291],type:'Local'},
-{id:'Local_MB_Tisy',name:'военная база',position:[1570,14069],type:'Local'},
-{id:'Local_MB_Kamensk',name:'военная база',position:[7838.812,14704.823],type:'Local'},
-{id:'Local_MB_Zeleno',name:'военная база',position:[2410.375,5133.6812],type:'Local'},
-{id:'Local_MB_Pavlovo',name:'военная база',position:[2016,3408],type:'Local'},
-{id:'Local_AF_Balota',name:'аэродром',position:[5082.0308,2376.3279],type:'Local'},
-{id:'Local_AF_Krasno',name:'аэродром',position:[12100.681,12573.896],type:'Local'},
-{id:'Local_AF_Vybor',name:'Авиационная база Выбор',position:[4428,10179],type:'Local'}
+{id:'Local_MB_VMC',name:'военная база (VMC)',position:[4497,8291],type:'Local'},
+{id:'Local_MB_Tisy',name:'военная база (Тисы)',position:[1570,14069],type:'Local'},
+{id:'Local_MB_Kamensk',name:'военная база (Каменск)',position:[7838.812,14704.823],type:'Local'},
+{id:'Local_MB_Zeleno',name:'военная база (Зеленогорск)',position:[2410.375,5133.6812],type:'Local'},
+{id:'Local_MB_Pavlovo',name:'военная база (Павлово)',position:[2016,3408],type:'Local'},
+{id:'Local_AF_Balota',name:'аэродром (Балота)',position:[5082.0308,2376.3279],type:'Local'},
+{id:'Local_AF_Krasno',name:'аэродром (Красностав)',position:[12100.681,12573.896],type:'Local'},
+{id:'Local_AF_Vybor',name:'Авиационная база Выбор (СЗ)',position:[4428,10179],type:'Local'}
 ];
 console.log('Names data loaded:', window.namesData.length, 'items');

@@ -326,7 +326,7 @@ body {
     grid-column: 1 / -1;
     box-shadow: var(--shadow-md);
     position: relative;
-    overflow: hidden;
+    z-index: 10;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -362,7 +362,7 @@ body {
     display: block;
     width: 100%;
     padding: 12px 15px;
-    margin: 10px 0 0 0;
+    margin: 0px 0 0 0;
     background: linear-gradient(135deg, var(--accent-secondary), #2980b9);
     color: white;
     text-decoration: none;
@@ -390,6 +390,111 @@ body {
     gap: var(--space-sm);
     align-items: center;
     flex-wrap: wrap;
+}
+
+/* Profiles Container */
+.profiles-container {
+    display: flex;
+    gap: var(--space-sm);
+    align-items: center;
+    margin-right: var(--space-md);
+    padding-right: var(--space-md);
+    border-right: 1px solid var(--border-primary);
+}
+
+.profiles-controls {
+    display: flex;
+    gap: var(--space-xs);
+    align-items: center;
+}
+
+.profiles-controls select {
+    min-width: 200px;
+    padding: var(--space-xs) var(--space-sm);
+    color: var(--text-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+    backdrop-filter: blur(10px);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+}
+
+.profiles-controls select:hover {
+    border-color: var(--accent-secondary);
+    background: rgba(52, 152, 219, 0.1);
+}
+
+.profiles-controls select:focus {
+    outline: none;
+    border-color: var(--accent-secondary);
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.profiles-controls select option {
+    background: var(--bg-card);
+    color: var(--text-primary);
+    padding: var(--space-xs);
+}
+
+.profiles-controls button {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    background: var(--bg-glass);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+    position: relative;
+    overflow: hidden;
+}
+
+.profiles-controls button:hover {
+    border-color: var(--accent-secondary);
+    color: var(--text-primary);
+    background: rgba(52, 152, 219, 0.1);
+    transform: translateY(-1px);
+}
+
+.profiles-controls button:active {
+    transform: translateY(0);
+}
+
+.profiles-controls button#saveProfileBtn:hover {
+    border-color: var(--accent-success);
+    color: var(--accent-success);
+    background: rgba(39, 174, 96, 0.1);
+}
+
+.profiles-controls button#createProfileBtn:hover {
+    border-color: var(--accent-success);
+    color: var(--accent-success);
+    background: rgba(39, 174, 96, 0.1);
+}
+
+.profiles-controls button#editProfileBtn:hover {
+    border-color: var(--accent-warning);
+    color: var(--accent-warning);
+    background: rgba(243, 156, 18, 0.1);
+}
+
+.profiles-controls button#setDefaultBtn:hover {
+    border-color: var(--accent-warning);
+    color: var(--accent-warning);
+    background: rgba(243, 156, 18, 0.1);
+}
+
+.profiles-controls button#deleteProfileBtn:hover {
+    border-color: var(--accent-danger);
+    color: var(--accent-danger);
+    background: rgba(192, 57, 43, 0.1);
 }
 
 .controls-row {
@@ -441,7 +546,20 @@ body {
     border-color: var(--border-primary);
 }
 
+/* Splitter Button - более специфичный селектор */
+.controls button#splitterBtn {
+    background: linear-gradient(135deg, var(--bg-tertiary), var(--bg-secondary));
+    border-color: var(--border-primary);
+}
+
 .controls button:not(.help-btn):hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--accent-secondary);
+}
+
+/* Splitter Button hover - более специфичный селектор */
+.controls button#splitterBtn:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-md);
     border-color: var(--accent-secondary);
@@ -481,7 +599,8 @@ body {
 .controls button#addMarkerBtn,
 .controls button#searchBtn,
 .controls button#addMarkerByCoords,
-.controls button#imHereBtn {
+.controls button#imHereBtn,
+.controls button#toggleCoordsBtn {
     background: linear-gradient(135deg, var(--accent-secondary), #2980b9) !important;
     border-color: var(--accent-secondary) !important;
     color: white !important;
@@ -490,7 +609,8 @@ body {
 .controls button#addMarkerBtn:hover,
 .controls button#searchBtn:hover,
 .controls button#addMarkerByCoords:hover,
-.controls button#imHereBtn:hover {
+.controls button#imHereBtn:hover,
+.controls button#toggleCoordsBtn:hover {
     background: linear-gradient(135deg, #2980b9, #21618c) !important;
     box-shadow: 0 0 20px rgba(52, 152, 219, 0.4) !important;
     transform: translateY(-2px) !important;
@@ -508,26 +628,28 @@ body {
     transform: translateY(-2px) !important;
 }
 
-.controls button#centerCoordsBtn {
+.controls button#centerCoordsBtn,
+.controls button#centerOnCoordsBtn {
     background: linear-gradient(135deg, var(--accent-purple), #8e44ad) !important;
     border-color: var(--accent-purple) !important;
     color: white !important;
 }
 
-.controls button#centerCoordsBtn:hover {
+.controls button#centerCoordsBtn:hover,
+.controls button#centerOnCoordsBtn:hover {
     background: linear-gradient(135deg, #8e44ad, #7d3c98) !important;
     box-shadow: 0 0 20px rgba(155, 89, 182, 0.4) !important;
     transform: translateY(-2px) !important;
 }
 
 /* Export Button */
-.controls button:last-child:not(.help-btn) {
+.controls button:last-child:not(.help-btn):not([id*="splitter"]) {
     background: linear-gradient(135deg, var(--accent-warning), #e67e22) !important;
     border-color: var(--accent-warning) !important;
     color: white !important;
 }
 
-.controls button:last-child:not(.help-btn):hover {
+.controls button:last-child:not(.help-btn):not([id*="splitter"]):hover {
     background: linear-gradient(135deg, #e67e22, #d35400) !important;
     box-shadow: 0 0 20px rgba(243, 156, 18, 0.4) !important;
     transform: translateY(-2px) !important;
@@ -540,6 +662,14 @@ body {
     flex-grow: 1;
     min-width: 150px;
     backdrop-filter: blur(10px);
+}
+
+/* Theme Selector - Fixed Width */
+.controls select#themeSelector {
+    flex-grow: 0;
+    width: 180px;
+    min-width: 180px;
+    max-width: 180px;
 }
 
 /* Modern Containers */
@@ -706,7 +836,361 @@ body {
     padding-right: 8px;
 }
 
-/* Глобальные стили для всех полос прокрутки */
+/* Выпадающее меню Инструменты */
+.tools-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-btn {
+    background: linear-gradient(135deg, var(--bg-tertiary), var(--bg-secondary)) !important;
+    border: 1px solid var(--border-primary) !important;
+    color: var(--text-primary) !important;
+    padding: var(--space-xs) var(--space-sm) !important;
+    border-radius: var(--radius-sm) !important;
+    cursor: pointer !important;
+    font-size: 0.875rem !important;
+    font-weight: 500 !important;
+    transition: all var(--transition-normal) !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 5px !important;
+    min-width: 140px !important;
+    justify-content: space-between !important;
+}
+
+.dropdown-btn:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: var(--shadow-md) !important;
+    border-color: var(--accent-secondary) !important;
+    background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary)) !important;
+}
+
+.dropdown-btn.active {
+    background: linear-gradient(135deg, var(--accent-secondary), #2980b9) !important;
+    border-color: var(--accent-secondary) !important;
+    color: white !important;
+}
+
+.dropdown-btn .dropdown-arrow {
+    transition: transform var(--transition-fast);
+    display: inline-block;
+}
+
+.dropdown-btn.active .dropdown-arrow {
+    transform: rotate(180deg);
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    min-width: 200px;
+    z-index: 1000;
+    display: none;
+    padding: var(--space-sm) 0;
+    backdrop-filter: blur(20px);
+    margin-top: 5px;
+}
+
+.dropdown-menu.show {
+    display: block;
+}
+
+.dropdown-menu button {
+    width: 100%;
+    padding: var(--space-sm) var(--space-md);
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    text-align: left;
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: all var(--transition-fast);
+    border-radius: 0;
+}
+
+.dropdown-menu button:hover {
+    background: var(--bg-glass);
+    color: var(--accent-secondary);
+    padding-left: calc(var(--space-md) + 5px);
+}
+
+.dropdown-divider {
+    height: 1px;
+    background: var(--border-primary);
+    margin: var(--space-sm) var(--space-md);
+}
+
+.theme-selector-wrapper {
+    padding: var(--space-sm) var(--space-md);
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.theme-selector-wrapper label {
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-weight: 500;
+    min-width: 40px;
+}
+
+.theme-selector-wrapper select {
+    flex: 1;
+    padding: 4px var(--space-sm);
+    background: var(--bg-glass);
+    color: var(--text-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    cursor: pointer;
+}
+
+.theme-selector-wrapper select:focus {
+    outline: none;
+    border-color: var(--accent-secondary);
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.theme-selector-wrapper select option {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+/* Контрол поиска города на карте */
+.city-search-map-control {
+    position: relative;
+    margin: 10px 0 0 0;
+    z-index: 1000;
+}
+
+/* Размещаем контрол поиска рядом с рисованием */
+.leaflet-top.leaflet-right .city-search-map-control {
+    margin-left: 10px;
+}
+
+.city-search-toggle-btn {
+    width: 40px !important;
+    height: 40px !important;
+    background: linear-gradient(135deg, var(--accent-secondary), #2980b9) !important;
+    border: 2px solid var(--accent-secondary) !important;
+    border-radius: var(--radius-md) !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: all var(--transition-normal) !important;
+    backdrop-filter: blur(20px) !important;
+    box-shadow: 0 0 15px rgba(52, 152, 219, 0.4) !important;
+    position: relative !important;
+    overflow: hidden !important;
+    animation: searchButtonPulse 3s ease-in-out infinite !important;
+}
+
+.city-search-toggle-btn:hover {
+    background: linear-gradient(135deg, #2980b9, #1f618d) !important;
+    border-color: var(--accent-primary) !important;
+    transform: scale(1.1) !important;
+    box-shadow: 0 0 25px rgba(52, 152, 219, 0.6) !important;
+}
+
+.city-search-toggle-btn.active {
+    border-color: var(--accent-primary) !important;
+    background: linear-gradient(135deg, var(--accent-primary), #c0392b) !important;
+    color: white !important;
+    box-shadow: 0 0 30px rgba(231, 76, 60, 0.6) !important;
+    transform: scale(1.05) !important;
+}
+
+.search-icon {
+    font-size: 18px;
+    line-height: 1;
+    transition: transform var(--transition-fast);
+    color: white !important;
+}
+
+.city-search-toggle-btn:hover .search-icon {
+    transform: scale(1.1);
+}
+
+.city-search-toggle-btn.active .search-icon {
+    transform: scale(1.1);
+}
+
+/* Панель поиска на карте */
+.city-search-map-panel {
+    position: absolute;
+    top: 0;
+    right: 50px;
+    left: auto;
+    background: var(--bg-card);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    min-width: 280px;
+    max-width: 350px;
+    backdrop-filter: blur(20px);
+    overflow: hidden;
+}
+
+/* Результаты поиска на карте - наследуем стили из хедера */
+.city-search-map-panel .city-search-results {
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 0;
+    margin: 0;
+    display: none;
+    box-shadow: var(--shadow-lg);
+}
+
+.city-search-map-panel .city-search-results.show {
+    display: block;
+}
+
+.city-search-map-panel .city-search-result-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    border-bottom: 1px solid var(--border-secondary);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+}
+
+.city-search-map-panel .city-search-result-item:last-child {
+    border-bottom: none;
+}
+
+.city-search-map-panel .city-search-result-item:hover {
+    background: var(--bg-glass);
+}
+
+.city-search-map-panel .city-search-result-item.selected {
+    background: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+.city-search-map-panel .city-name {
+    font-weight: 500;
+    color: var(--text-primary);
+    flex: 1;
+}
+
+.city-search-map-panel .city-type {
+    font-size: 11px;
+    color: var(--text-muted);
+    background: var(--bg-tertiary);
+    padding: 2px 4px;
+    border-radius: var(--radius-sm);
+}
+
+.city-search-map-panel .city-search-result-item.selected .city-type {
+    background: rgba(255, 255, 255, 0.2);
+    color: var(--text-primary);
+}
+
+/* Подсветка совпадений в названии */
+.city-search-map-panel .city-name strong {
+    color: var(--accent-secondary);
+    font-weight: 600;
+}
+
+.city-search-map-panel .city-search-result-item.selected .city-name strong {
+    color: inherit;
+}
+
+.city-search-input-wrapper {
+    display: flex;
+    align-items: center;
+    padding: var(--space-sm);
+    border-bottom: 1px solid var(--border-primary);
+    background: var(--bg-glass);
+}
+
+.city-search-input-wrapper input {
+    flex: 1;
+    padding: var(--space-sm) var(--space-md);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    outline: none;
+    transition: all var(--transition-normal);
+}
+
+.city-search-input-wrapper input:focus {
+    border-color: var(--accent-secondary);
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+    background: var(--bg-tertiary);
+}
+
+.city-search-input-wrapper input::placeholder {
+    color: var(--text-muted);
+}
+
+.city-search-close-btn {
+    width: 28px !important;
+    height: 28px !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: var(--radius-sm) !important;
+    color: var(--text-muted) !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 16px !important;
+    font-weight: bold !important;
+    margin-left: var(--space-xs) !important;
+    transition: all var(--transition-fast) !important;
+}
+
+.city-search-close-btn:hover {
+    background: var(--accent-danger) !important;
+    color: white !important;
+    transform: scale(1.1) !important;
+}
+
+/* Адаптивность для мобильных */
+@media (max-width: 768px) {
+    .city-search-map-control {
+        margin: 5px 0 0 5px;
+    }
+    
+    .city-search-map-panel {
+        min-width: 250px;
+        max-width: calc(100vw - 80px);
+        right: 45px;
+    }
+    
+    .city-search-toggle-btn {
+        width: 35px !important;
+        height: 35px !important;
+    }
+    
+    .search-icon {
+        font-size: 16px;
+    }
+}
+
+/* Анимация пульсации для кнопки поиска */
+@keyframes searchButtonPulse {
+    0%, 100% { 
+        box-shadow: 0 0 15px rgba(52, 152, 219, 0.4); 
+    }
+    50% { 
+        box-shadow: 0 0 25px rgba(52, 152, 219, 0.6); 
+    }
+}
+
+/* Стили для полос прокрутки */
 ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -755,6 +1239,7 @@ input[type="number"]::-webkit-outer-spin-button:hover {
     cursor: pointer;
     width: 100%;
     box-sizing: border-box;
+    position: relative; /* Для корректного позиционирования индикаторов drag-and-drop */
 }
 
 .marker-item:hover {
@@ -972,16 +1457,33 @@ input[type="number"]::-webkit-outer-spin-button:hover {
     gap: 5px;
     align-items: center;
     flex-wrap: wrap;
+    position: relative;
+}
+
+.coords-block {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+    flex-wrap: wrap;
 }
 
 .coord-inputs input {
     width: 80px;
     padding: 6px;
-    background: #444;
-    color: white;
-    border: 1px solid #666;
-    border-radius: 3px;
-    font-size: 0.9em;
+    background: var(--bg-glass);
+    color: var(--text-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all var(--transition-normal);
+}
+
+.coord-inputs input:focus {
+    outline: none;
+    border-color: var(--accent-secondary);
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+    background: rgba(52, 152, 219, 0.05);
 }
 
 .coord-inputs input[type="text"] {
@@ -989,12 +1491,136 @@ input[type="number"]::-webkit-outer-spin-button:hover {
 }
 
 .coord-inputs button {
-    padding: 6px 10px;
-    border: none;
-    border-radius: 3px;
+    padding: var(--space-xs) var(--space-sm);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-sm);
     cursor: pointer;
-    font-size: 0.9em;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all var(--transition-normal);
+    background: var(--bg-glass);
+    color: var(--text-primary);
     white-space: nowrap;
+}
+
+.coord-inputs button:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--accent-secondary);
+}
+
+.coord-inputs button:not(.help-btn) {
+    background: linear-gradient(135deg, var(--bg-tertiary), var(--bg-secondary));
+    border-color: var(--border-primary);
+}
+
+/* Стили для блока ввода координат */
+#coordsInputsBlock {
+    position: fixed;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-sm);
+    padding: var(--space-sm);
+    box-shadow: var(--shadow-md);
+    z-index: 999999;
+    min-width: 250px;
+}
+
+.coords-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.coords-row:last-child {
+    margin-bottom: 0;
+}
+
+.coords-row input {
+    flex: 1;
+}
+
+.coords-row button {
+    width: 100%;
+}
+
+#coordsInputsBlock input {
+    width: 70px;
+    padding: 4px 6px;
+    background: var(--bg-glass);
+    color: var(--text-primary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-xs);
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+#coordsInputsBlock input:focus {
+    outline: none;
+    border-color: var(--accent-secondary);
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.1);
+    background: rgba(52, 152, 219, 0.05);
+}
+
+#coordsInputsBlock button {
+    padding: 4px 8px;
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-xs);
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 600;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+}
+
+#coordsInputsBlock button:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+#coordsInputsBlock #centerOnCoordsBtn {
+    background: linear-gradient(135deg, var(--accent-purple), #8e44ad);
+    border-color: var(--accent-purple);
+    color: white;
+}
+
+#coordsInputsBlock #centerOnCoordsBtn:hover {
+    background: linear-gradient(135deg, #8e44ad, #7d3c98);
+    box-shadow: 0 0 20px rgba(155, 89, 182, 0.4);
+}
+
+#coordsInputsBlock #addMarkerByCoords {
+    background: linear-gradient(135deg, var(--accent-secondary), #2980b9);
+    border-color: var(--accent-secondary);
+    color: white;
+}
+
+#coordsInputsBlock #addMarkerByCoords:hover {
+    background: linear-gradient(135deg, #2980b9, #21618c);
+    box-shadow: 0 0 20px rgba(52, 152, 219, 0.4);
+}
+
+#coordsInputsBlock #buildRouteBtn {
+    background: linear-gradient(135deg, var(--accent-secondary), #2980b9);
+    border-color: var(--accent-secondary);
+    color: white;
+}
+
+#coordsInputsBlock #buildRouteBtn:hover {
+    background: linear-gradient(135deg, #2980b9, #21618c);
+    box-shadow: 0 0 20px rgba(52, 152, 219, 0.4);
+}
+
+#coordsInputsBlock #clearRouteBtn {
+    background: linear-gradient(135deg, var(--accent-danger), #c0392b) !important;
+    border-color: var(--accent-danger) !important;
+    color: white !important;
+}
+
+#coordsInputsBlock #clearRouteBtn:hover {
+    background: linear-gradient(135deg, #c0392b, #a93226) !important;
+    box-shadow: 0 0 20px rgba(231, 76, 60, 0.4) !important;
+    transform: translateY(-2px) !important;
 }
 
 /* Разделители */
@@ -1003,6 +1629,13 @@ input[type="number"]::-webkit-outer-spin-button:hover {
     height: 30px;
     background: #555;
     margin: 0 5px;
+}
+
+.coords-separator {
+    height: 1px;
+    width: 100%;
+    background: #555;
+    margin: 5px 0;
 }
 
 /* Модальные окна */
@@ -1019,6 +1652,94 @@ input[type="number"]::-webkit-outer-spin-button:hover {
 
 .modal-overlay.active {
     display: block;
+}
+
+/* Profile Modal Styles */
+.modal {
+    position: fixed;
+    z-index: 10000;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--bg-card);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    backdrop-filter: blur(20px);
+    display: none;
+    min-width: 300px;
+    max-width: 90vw;
+}
+
+.modal-content {
+    padding: var(--space-lg);
+    color: var(--text-primary);
+}
+
+.modal-content h3 {
+    margin: 0 0 var(--space-md) 0;
+    color: var(--text-primary);
+    font-size: 1.1rem;
+}
+
+.modal-content input {
+    width: 100%;
+    padding: var(--space-sm);
+    margin-bottom: var(--space-md);
+    background: var(--bg-glass);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.modal-content input:focus {
+    outline: none;
+    border-color: var(--accent-secondary);
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.modal-content button {
+    padding: var(--space-xs) var(--space-md);
+    margin-right: var(--space-sm);
+    background: var(--accent-secondary);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all var(--transition-normal);
+}
+
+.modal-content button:hover {
+    background: #2980b9;
+    transform: translateY(-1px);
+}
+
+.modal-content button:last-child {
+    margin-right: 0;
+}
+
+.modal-content button#cancelCreateProfile {
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+}
+
+.modal-content button#cancelCreateProfile:hover {
+    background: var(--bg-secondary);
+}
+
+.close {
+    color: var(--text-muted);
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.close:hover {
+    color: var(--text-primary);
 }
 
 .marker-modal {
@@ -1391,6 +2112,66 @@ input[type="number"]::-webkit-outer-spin-button:hover {
     border-left: 6px solid transparent;
     border-right: 6px solid transparent;
     border-bottom: 6px solid #3498db;
+}
+
+/* Тултип с координатами */
+.coords-tooltip {
+    position: fixed;
+    background: rgba(0, 0, 0, 0.95);
+    color: white;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #3498db;
+    z-index: 10000;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.coords-tooltip::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 6px solid #3498db;
+}
+
+.coords-tooltip-content {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    pointer-events: all;
+}
+
+.coords-tooltip-content input {
+    width: 70px;
+    padding: 6px;
+    background: #444;
+    color: white;
+    border: 1px solid #666;
+    border-radius: 3px;
+    font-size: 13px;
+}
+
+.coords-tooltip-content button {
+    padding: 6px 8px;
+    background: #3498db;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.coords-tooltip-content button:hover {
+    background: #2980b9;
 }
 
 /* Стили для активного фильтра */
@@ -1812,9 +2593,29 @@ input[type="number"]::-webkit-outer-spin-button:hover {
     .coord-inputs input[type="text"] {
         width: 100%;
     }
-    
+
     .coord-inputs button {
         width: 100%;
+    }
+
+    /* Адаптация блока ввода координат для мобильных */
+    #coordsInputsBlock {
+        min-width: 200px;
+    }
+
+    .coords-row {
+        gap: 6px;
+        margin-bottom: 6px;
+    }
+
+    .coords-row input {
+        padding: 6px;
+        font-size: 0.85rem;
+    }
+
+    .coords-row button {
+        padding: 6px 8px;
+        font-size: 0.85rem;
     }
     
     .sort-btn {
@@ -2644,6 +3445,99 @@ input[type="range"]::-moz-range-thumb {
     align-items: center;
 }
 
+/* Стили для поиска городов в хедере */
+.header .city-search-container {
+    display: inline-block;
+    width: 200px;
+    margin: 0 10px;
+    position: relative;
+    vertical-align: middle;
+}
+
+.header #citySearchInput {
+    width: 100%;
+    padding: 6px;
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-sm);
+    background: var(--bg-glass);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all var(--transition-normal);
+    box-sizing: border-box;
+}
+
+.header #citySearchInput:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 10px rgba(231, 76, 60, 0.3);
+}
+
+.header #citySearchInput::placeholder {
+    color: var(--text-muted);
+}
+
+.header .city-search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-card);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 999999;
+    margin-top: 2px;
+    display: none;
+    box-shadow: var(--shadow-lg);
+}
+
+.header .city-search-results.show {
+    display: block;
+}
+
+.header .city-search-result-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    border-bottom: 1px solid var(--border-secondary);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+}
+
+.header .city-search-result-item:last-child {
+    border-bottom: none;
+}
+
+.header .city-search-result-item:hover {
+    background: var(--bg-glass);
+}
+
+.header .city-search-result-item.selected {
+    background: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+.header .city-name {
+    font-weight: 500;
+}
+
+.header .city-type {
+    font-size: 11px;
+    color: var(--text-muted);
+    background: var(--bg-tertiary);
+    padding: 2px 4px;
+    border-radius: var(--radius-sm);
+}
+
+.header .city-search-result-item.selected .city-type {
+    background: rgba(255, 255, 255, 0.2);
+    color: var(--text-primary);
+}
+
 .name-label {
     pointer-events: none;
 }
@@ -2654,7 +3548,7 @@ input[type="range"]::-moz-range-thumb {
     padding: 2px 6px;
     font-size: 12px;
     font-weight: bold;
-    white-space: nowrap;
+    /*white-space: nowrap;*/
     margin-left: 8px;
     text-shadow:
         -1px -1px 0 #000,
@@ -2662,9 +3556,9 @@ input[type="range"]::-moz-range-thumb {
         -1px 1px 0 #000,
         1px 1px 0 #000,
         0 0 2px #000;
-    max-width: 180px;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    max-width: 150px;
+    /*overflow: hidden;
+    text-overflow: ellipsis;*/
 }
 
 /* Стили для разных типов локаций */
@@ -2705,4 +3599,644 @@ input[type="range"]::-moz-range-thumb {
 .name-text[data-type="Marine"] {
     color: #74b9ff;
     font-size: 11px;
+}
+
+/* Стили для drag-and-drop */
+.marker-item.dragging {
+    opacity: 0.5 !important;
+    transform: rotate(5deg) !important;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3) !important;
+    z-index: 1000 !important;
+}
+
+.marker-item.drag-over-above,
+.marker-item.drag-over-below {
+    border: 2px solid #3498db !important;
+    box-shadow: 0 0 12px rgba(52, 152, 219, 0.6) !important;
+    background: rgba(52, 152, 219, 0.05) !important;
+}
+
+.marker-item.drag-over-above::before {
+    content: '⬆ ВСТАВИТЬ ЗДЕСЬ ⬆';
+    position: absolute;
+    top: -12px;
+    left: 0;
+    right: 0;
+    height: 20px;
+    background: #3498db;
+    color: white;
+    font-size: 10px;
+    font-weight: bold;
+    text-align: center;
+    line-height: 20px;
+    border-radius: 3px 3px 0 0;
+    box-shadow: 0 0 8px rgba(52, 152, 219, 0.8);
+    z-index: 100;
+    animation: blink 1s infinite;
+}
+
+.marker-item.drag-over-below::after {
+    content: '⬇ ВСТАВИТЬ ЗДЕСЬ ⬇';
+    position: absolute;
+    bottom: -12px;
+    left: 0;
+    right: 0;
+    height: 20px;
+    background: #3498db;
+    color: white;
+    font-size: 10px;
+    font-weight: bold;
+    text-align: center;
+    line-height: 20px;
+    border-radius: 0 0 3px 3px;
+    box-shadow: 0 0 8px rgba(52, 152, 219, 0.8);
+    z-index: 100;
+    animation: blink 1s infinite;
+}
+
+@keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0.7; }
+}
+
+/* Предотвращаем выделение текста во время перетаскивания */
+.marker-item.dragging * {
+    user-select: none;
+    pointer-events: none;
+}
+
+/* Визуальная обратная связь для курсора */
+.marker-item[draggable="true"] {
+    cursor: grab;
+}
+
+.marker-item[draggable="true"]:active {
+    cursor: grabbing;
+}
+
+/* Стили для выделения области */
+.area-selection-polygon {
+    fill: rgba(52, 152, 219, 0.2);
+    stroke: #3498db;
+    stroke-width: 2;
+    stroke-dasharray: 5, 5;
+}
+
+.area-selection-mode-active {
+    cursor: crosshair !important;
+}
+
+.area-selection-hint {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 14px;
+    z-index: 10000;
+    pointer-events: none;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.area-selection-hint.hidden {
+    display: none;
+}
+
+/* ========================================
+   Стили для рисования фигур
+   ======================================== */
+
+/* Контрол рисования на карте */
+.draw-map-control {
+    position: relative;
+    margin: 10px 0 0 0;
+    z-index: 1000;
+}
+
+/* Размещаем контрол рисования рядом с поиском городов */
+.leaflet-top.leaflet-right .draw-map-control {
+    margin-right: 10px;
+}
+
+/* Кнопка переключения рисования */
+.draw-toggle-btn {
+    width: 40px !important;
+    height: 40px !important;
+    background: linear-gradient(135deg, var(--accent-purple), #8e44ad) !important;
+    border: 2px solid var(--accent-purple) !important;
+    border-radius: var(--radius-md) !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: all var(--transition-normal) !important;
+    backdrop-filter: blur(20px) !important;
+    box-shadow: 0 0 15px rgba(155, 89, 182, 0.4) !important;
+    position: relative !important;
+    overflow: hidden !important;
+    animation: searchButtonPulse 3s ease-in-out infinite !important;
+}
+
+.draw-toggle-btn:hover {
+    background: linear-gradient(135deg, #8e44ad, #7d3c98) !important;
+    border-color: var(--accent-primary) !important;
+    transform: scale(1.1) !important;
+    box-shadow: 0 0 25px rgba(155, 89, 182, 0.6) !important;
+}
+
+.draw-toggle-btn.active {
+    border-color: var(--accent-primary) !important;
+    background: linear-gradient(135deg, var(--accent-primary), #c0392b) !important;
+    color: white !important;
+    box-shadow: 0 0 30px rgba(231, 76, 60, 0.6) !important;
+    transform: scale(1.05) !important;
+}
+
+.draw-icon {
+    font-size: 18px;
+    line-height: 1;
+    transition: transform var(--transition-fast);
+    color: white !important;
+}
+
+.draw-toggle-btn:hover .draw-icon {
+    transform: scale(1.1);
+}
+
+.draw-toggle-btn.active .draw-icon {
+    transform: scale(1.1);
+}
+
+/* Панель инструментов рисования */
+.draw-map-panel {
+    position: absolute;
+    top: 0;
+    right: 100%;
+    background: var(--bg-card);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    min-width: 60px;
+    z-index: 1001;
+    display: none;
+    padding: var(--space-sm) 0;
+    backdrop-filter: blur(20px);
+    margin-right: 5px;
+}
+
+.draw-map-panel.show {
+    display: block;
+}
+
+.draw-map-panel .draw-mode-btn {
+    width: 40px !important;
+    height: 40px !important;
+    padding: 0 !important;
+    margin: 0 auto !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: transparent !important;
+    border: none !important;
+    color: var(--text-primary) !important;
+    font-size: 18px !important;
+    cursor: pointer !important;
+    transition: all var(--transition-fast) !important;
+}
+
+.draw-map-panel .draw-mode-btn:hover {
+    background: var(--bg-glass) !important;
+    transform: scale(1.1);
+}
+
+.draw-map-panel .draw-divider {
+    height: 1px;
+    background: var(--border-primary);
+    margin: var(--space-sm) 0;
+}
+/* Стили для фигур на карте */
+.map-shape-circle,
+.map-shape-rectangle,
+.map-shape-polygon,
+.map-shape-line {
+    pointer-events: all;
+    cursor: pointer;
+}
+
+.map-shape-circle:hover,
+.map-shape-rectangle:hover,
+.map-shape-polygon:hover {
+    opacity: 0.7;
+}
+
+/* Стиль по умолчанию для фигур - светло-серый с 50% прозрачностью */
+.shape-default-style {
+    fill: rgba(200, 200, 200, 0.5) !important;
+    stroke: #888 !important;
+    stroke-width: 2 !important;
+}
+
+.shape-default-style-line {
+    stroke: rgba(200, 200, 200, 0.8) !important;
+    stroke-width: 3 !important;
+    fill: none !important;
+}
+
+/* Подсказка при рисовании */
+.drawing-hint {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.85);
+    color: white;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    z-index: 10000;
+    pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.drawing-hint.hidden {
+    display: none;
+}
+
+.drawing-hint kbd {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 11px;
+}
+
+/* Контекстное меню для фигур */
+.shape-context-menu {
+    position: absolute;
+    background: var(--bg-card);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    z-index: 100000;
+    min-width: 180px;
+    padding: var(--space-sm) 0;
+    backdrop-filter: blur(20px);
+}
+
+.shape-context-menu button {
+    width: 100%;
+    padding: var(--space-sm) var(--space-md);
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    text-align: left;
+    cursor: pointer;
+    font-size: 0.875rem;
+    transition: all var(--transition-fast);
+}
+
+.shape-context-menu button:hover {
+    background: var(--bg-glass);
+    color: var(--accent-secondary);
+}
+
+.shape-context-menu .divider {
+    height: 1px;
+    background: var(--border-primary);
+    margin: var(--space-sm) 0;
+}
+
+/* ========================================
+   Контрол измерения расстояния на карте
+   ======================================== */
+.measurement-map-control {
+    position: relative;
+    margin: 10px 0 0 0;
+    z-index: 1000;
+}
+
+.leaflet-top.leaflet-right .measurement-map-control {
+    margin-right: 10px;
+}
+
+.measurement-toggle-btn {
+    width: 40px !important;
+    height: 40px !important;
+    background: linear-gradient(135deg, #27ae60, #2ecc71) !important;
+    border: 2px solid #27ae60 !important;
+    border-radius: var(--radius-md) !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: all var(--transition-normal) !important;
+    backdrop-filter: blur(20px) !important;
+    box-shadow: 0 0 15px rgba(46, 204, 113, 0.4) !important;
+    position: relative !important;
+    overflow: hidden !important;
+    animation: searchButtonPulse 3s ease-in-out infinite !important;
+}
+
+.measurement-toggle-btn:hover {
+    background: linear-gradient(135deg, #2ecc71, #27ae60) !important;
+    border-color: #2ecc71 !important;
+    transform: scale(1.1) !important;
+    box-shadow: 0 0 25px rgba(46, 204, 113, 0.6) !important;
+}
+
+.measurement-toggle-btn.active {
+    border-color: #2ecc71 !important;
+    background: linear-gradient(135deg, #27ae60, #1abc9c) !important;
+    color: white !important;
+    box-shadow: 0 0 30px rgba(46, 204, 113, 0.6) !important;
+    transform: scale(1.05) !important;
+}
+
+.measurement-icon {
+    font-size: 18px;
+    line-height: 1;
+    transition: transform var(--transition-fast);
+    color: white !important;
+}
+
+.measurement-toggle-btn:hover .measurement-icon {
+    transform: scale(1.1);
+}
+
+.measurement-toggle-btn.active .measurement-icon {
+    transform: scale(1.1);
+}
+
+.measurement-map-panel {
+    position: absolute;
+    top: 0;
+    right: 100%;
+    background: var(--bg-card);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+    min-width: 150px;
+    z-index: 1001;
+    display: none;
+    padding: var(--space-sm);
+    backdrop-filter: blur(20px);
+    margin-right: 5px;
+}
+
+.measurement-map-panel.show {
+    display: block;
+}
+
+.measurement-start-btn {
+    width: 100% !important;
+    padding: var(--space-sm) var(--space-md) !important;
+    background: linear-gradient(135deg, #27ae60, #2ecc71) !important;
+    border: none !important;
+    border-radius: var(--radius-sm) !important;
+    color: white !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    transition: all var(--transition-fast) !important;
+    font-size: 0.875rem !important;
+}
+
+.measurement-start-btn:hover {
+    background: linear-gradient(135deg, #2ecc71, #27ae60) !important;
+    transform: scale(1.05) !important;
+    box-shadow: 0 2px 8px rgba(46, 204, 113, 0.4) !important;
+}
+
+.measurement-divider {
+    height: 1px;
+    background: var(--border-primary);
+    margin: var(--space-sm) 0;
+}
+
+.measurement-clear-btn {
+    width: 100% !important;
+    padding: var(--space-sm) var(--space-md) !important;
+    background: transparent !important;
+    border: none !important;
+    color: #e74c3c !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    transition: all var(--transition-fast) !important;
+    font-size: 0.875rem !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 5px !important;
+}
+
+.measurement-clear-btn:hover {
+    background: rgba(231, 76, 60, 0.1) !important;
+    transform: scale(1.05) !important;
+}
+
+/* Отображение расстояния при измерении */
+.measurement-distance-display {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.85);
+    color: white;
+    padding: 15px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    z-index: 10000;
+    pointer-events: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 250px;
+}
+
+.measurement-distance-display.hidden {
+    display: none;
+}
+
+/* Метки расстояний сегментов (без фона, чтобы не мешали) */
+.measurement-segment-label {
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: #e74c3c;
+    font-weight: 600;
+    font-size: 12px;
+    white-space: nowrap;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.9), -1px -1px 2px rgba(0, 0, 0, 0.9);
+    pointer-events: none;
+}
+
+.measurement-segment-label span {
+    display: block;
+    text-align: center;
+}
+
+/* Метки накопленного расстояния точек (без фона) */
+.measurement-point-label {
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: #2ecc71;
+    font-weight: 600;
+    font-size: 12px;
+    white-space: nowrap;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.9), -1px -1px 2px rgba(0, 0, 0, 0.9);
+    pointer-events: none;
+}
+
+.measurement-point-label span {
+    display: block;
+    text-align: center;
+}
+
+.measurement-distance-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+}
+
+.measurement-label {
+    color: #bdc3c7;
+    font-size: 13px;
+}
+
+.measurement-value {
+    color: #2ecc71;
+    font-weight: 600;
+    font-size: 15px;
+    white-space: nowrap;
+}
+
+.measurement-hint {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    text-align: center;
+    font-size: 12px;
+    color: #95a5a6;
+}
+
+.measurement-hint kbd {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 11px;
+}
+
+/* Стили для модальных окон фигур */
+.shape-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 10001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.shape-modal {
+    background: var(--bg-card);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-lg);
+    padding: var(--space-lg);
+    max-width: 450px;
+    width: 90%;
+    box-shadow: var(--shadow-lg);
+}
+
+.shape-modal h3 {
+    margin-bottom: var(--space-md);
+    color: var(--accent-primary);
+    font-size: 1.1rem;
+}
+
+.shape-modal label {
+    display: block;
+    margin-bottom: var(--space-xs);
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.shape-modal input[type="text"],
+.shape-modal input[type="number"] {
+    width: 100%;
+    padding: var(--space-sm);
+    margin-bottom: var(--space-md);
+    background: var(--bg-glass);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+}
+
+.shape-modal input[type="color"] {
+    width: 60px;
+    height: 35px;
+    padding: 0;
+    border: 1px solid var(--border-primary);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+
+.shape-modal-buttons {
+    display: flex;
+    gap: var(--space-sm);
+    justify-content: flex-end;
+    margin-top: var(--space-md);
+}
+
+.shape-modal-buttons button {
+    padding: var(--space-sm) var(--space-md);
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+}
+
+.shape-modal-buttons .btn-primary {
+    background: linear-gradient(135deg, var(--accent-secondary), #2980b9);
+    border: none;
+    color: white;
+}
+
+.shape-modal-buttons .btn-primary:hover {
+    background: linear-gradient(135deg, #2980b9, #21618c);
+    transform: translateY(-2px);
+}
+
+.shape-modal-buttons .btn-secondary {
+    background: var(--bg-glass);
+    border: 1px solid var(--border-primary);
+    color: var(--text-primary);
+}
+
+.shape-modal-buttons .btn-secondary:hover {
+    background: var(--bg-tertiary);
+}
+
+.shape-modal-buttons .btn-danger {
+    background: linear-gradient(135deg, var(--accent-danger), #c0392b);
+    border: none;
+    color: white;
+}
+
+.shape-modal-buttons .btn-danger:hover {
+    background: linear-gradient(135deg, #c0392b, #a93226);
+    transform: translateY(-2px);
 }
