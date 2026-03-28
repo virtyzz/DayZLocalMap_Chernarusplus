@@ -1,4 +1,6 @@
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0.html)
+[![Version](https://img.shields.io/badge/version-1.0.0-brightgreen.svg)](https://github.com/virtyzz/DayZLocalMap_Chernarusplus/releases)
+[![GitHub last commit](https://img.shields.io/github/last-commit/virtyzz/DayZLocalMap_Chernarusplus.svg)](https://github.com/virtyzz/DayZLocalMap_Chernarusplus/commits)
 
 # DayZ Интерактивная карта ChernarusPlus
 
@@ -42,4 +44,6 @@
 3. Проверьте доступность директорий с тайлами
 4. Убедитесь что веб-сервер правильно обслуживает файлы
 
-Для вопросов и предложений создавайте issue в репозитории проекта.
+Для вопросов и предложений создавайте issue в репозитории проекта. 
+ 
+[![Создать сообщение о проблеме](https://img.shields.io/badge/Сообщить_о_проблеме-Создать_Issue-red?logo=github)](https://github.com/virtyzz/DayZLocalMap_Chernarusplus/issues/new)
