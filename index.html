@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DayZ Map</title>
+	<!-- SEO мета-теги -->
+    <meta name="description" content="DayZ Чернарусь (Chernarus) - интерактивная карта для выживания. Ставьте и отслеживайте метки, координаты, военные базы, лута и точки интереса или импортируйте игровые метки (необходимо наличие lbmaster(lbgroup) на вашем сервере). Полная карта Чернарусь с поиском и инструментами для навигации.">
+    <meta name="keywords" content="dayz чернарусь, dayz чернорусь, dayz chernarus, карта dayz, интерактивная карта dayz, метки dayz, координаты dayz, выживание dayz, лута dayz, военные базы dayz, карта чернарусь, карта чернорусь, lbmaster, lbgroup, совместимость">	
+    <link rel="stylesheet" href="shared/css/map-style.css">
+    <link rel="stylesheet" href="shared/css/bulk_import_styles.css">
+    <link rel="stylesheet" href="css/map-nav.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+</head>
+<body data-map-id="cherno">
+    <div class="container">
+        <div class="header">
+            <h1>DayZ Chernarus</h1>
+            <div class="controls">
+                <button id="addMarkerBtn">Добавить метку</button>
+                <button id="clearMarkersBtn">Очистить все метки</button>
+				<div class="control-separator"></div>
+				<div class="coord-inputs">
+                    <button id="toggleCoordsBtn">Ввод по X и Y</button>
+                    <div id="coordsInputsBlock" style="display: none;">
+                        <div class="coords-row">
+                            <input type="number" id="coordX" placeholder="X" min="0" max="15360">
+                            <input type="number" id="coordY" placeholder="Y" min="0" max="15360">
+                        </div>
+                        <div class="coords-row">
+                            <button id="centerOnCoordsBtn">Центрировать</button>
+                        </div>
+                        <div class="coords-row">
+                            <button id="addMarkerByCoords">Добавить по координатам</button>
+                        </div>
+                        <div class="coords-separator"></div>
+                        <div class="coords-row">
+                            <button id="buildRouteBtn">Построить маршрут</button>
+                        </div>
+                        <div class="coords-row">
+                            <button id="clearRouteBtn">Очистить маршрут</button>
+                        </div>
+                    </div>
+					<button id="coordsHelpBtn" class="help-btn" title="Подсказка по использованию координат">?</button>
+                </div>
+				<div class="control-separator"></div>
+                <div class="coord-inputs">
+                    <input type="text" id="dayzCoordsInput" placeholder="X Z Y Degree" style="width: 200px;">
+                    <button id="centerCoordsBtn">Центрировать</button>
+                    <button id="imHereBtn">Воткнуть метку</button>
+					<button id="coordsHelpBtn2" class="help-btn" title="Подсказка по использованию координат">?</button>
+                </div>
+				<div class="control-separator"></div>
+				<div class="tools-dropdown">
+					<button id="toolsDropdownBtn" class="dropdown-btn">Инструменты <span class="dropdown-arrow">▼</span></button>
+					<div id="toolsDropdownMenu" class="dropdown-menu">
+						<button id="bulkImportMarkersBtn">Массовый ввод меток</button>
+						<button id="importMarkersBtn">Импорт меток</button>
+						<button id="exportMarkersBtn">Экспорт меток</button>
+						<div class="dropdown-divider"></div>
+						<button id="importShapesBtn">Импорт фигур</button>
+						<button id="exportShapesBtn">Экспорт фигур</button>
+						<div class="dropdown-divider"></div>
+						<button id="splitterBtn">Splitter</button>
+						<button id="timersBtn">Таймеры</button>
+						<button id="currencyConverterBtn">Конвертер валюты (YourWorld)</button>
+						<button id="areaSelectionBtn">Выделение и поиск в области</button>
+						<div class="dropdown-divider"></div>
+						<button id="copyPathBtn">Копировать путь к папке с метками</button>
+						<button id="downloadLinkBtn">Скачать ярлык к папке с метками</button>
+						<div class="dropdown-divider"></div>
+						<div class="theme-selector-wrapper">
+							<label for="themeSelector">Тема:</label>
+							<select id="themeSelector">
+								<option value="dark">Стандартная</option>
+								<option value="light">Светлая</option>
+								<option value="winter">Зимняя</option>
+							</select>
+						</div>
+					</div>
+				</div>
+            </div>
+        </div>
+        
+        <div class="map-container">
+            <div id="map"></div>
+        </div>
+        
+        <div class="sidebar">
+            <!-- Кнопка перехода к руководству -->
+            <a href="shared/guide/user_guide.html" class="guide-button" title="Открыть руководство пользователя" target="_blank" rel="noopener noreferrer">
+                📖 Руководство пользователя
+            </a>
+            <div class="markers-search">
+				<div class="search-hint-v1">
+					<details>
+						<summary><b>Подсказка:</b></summary>
+						<div class="search-hint" style="font-size: 11px; color: #7f8c8d; margin-top: 5px; padding: 5px; background: #f8f9fa; border-radius: 3px;">
+							Пробел = И, | = ИЛИ, кавычки для точной фразы<br>
+							<br>Одно слово: дом - обычный поиск<br>
+							<br>Несколько слов (И): мой дом - найдет метки, содержащие И "мой" И "дом"<br>
+							<br>Оператор ИЛИ: дом|склад - найдет метки, содержащие ИЛИ "дом" ИЛИ "склад"<br>
+							<br>Точная фраза: "мой дом" - найдет точное совпадение фразы<br>
+							<br>
+							<strong>Комбинированный поиск:</strong><br>
+							• оборотень|@дом - найдет метки с названием "оборотень" ИЛИ типа "дом"<br>
+							• @медведь|@череп - найдет метки типа "медведь" ИЛИ "череп"<br>
+							• "мой дом"|@🚗 - точная фраза ИЛИ тип "автомобиль"<br>
+							<br>
+							<strong>Поиск по типу метки:</strong><br>
+							• @дом - найдет все метки типа "дом" (частичное совпадение)<br>
+							• @@дом - найдет точное совпадение типа "дом"<br>
+							• @🚗 - найдет все автомобильные метки<br>
+							<br>
+							<strong>Поиск по названию:</strong><br>
+							• "точная фраза" - точное совпадение<br>
+							• слово - частичное совпадение<br>
+						</div>
+					</details>
+				</div>
+				
+                <div class="search-wrapper">
+                <input type="text" id="searchMarkers" placeholder="Поиск по названию или типу метки...">
+				<div class="search-history-section">
+					<details id="searchHistoryDetails" open="false">
+						<summary>
+							<strong>История поиска</strong>
+							<span id="searchHistoryCount" style="color: #888; font-size: 0.9em; margin-left: 10px;">(0)</span>
+						</summary>
+						<div style="margin-top: 10px;">
+							<div id="searchHistoryList" class="search-history-items"></div>
+							<button id="clearSearchHistory" style="padding: 5px 10px; background: #e74c3c; color: white; border: none; border-radius: 3px; cursor: pointer; margin-top: 10px;">Очистить историю</button>
+						</div>
+					</details>
+				</div>
+			</div>
+				<select id="searchType">
+					<option value="">Все типы</option>
+					<option value="default">Обычный маркер</option>
+					<option value="cross">X</option>
+					<option value="home">Дом H</option>
+					<option value="camp">Лагерь C</option>
+					<option value="safezone">Безопасная зона S</option>
+					<option value="blackmarket">Черный рынок B</option>
+					<option value="hospital">Госпиталь +</option>
+					<option value="sniper">Снайпер ⊙</option>
+					<option value="player">Игрок P</option>
+					<option value="flag">Флаг ⚑</option>
+					<option value="star">Звезда ★</option>
+					<option value="car">Автомобиль 🚗</option>
+					<option value="parking">Парковка P</option>
+					<option value="heli">Вертолет 🚁</option>
+					<option value="rail">Железная дорога 🚆</option>
+					<option value="ship">Корабль ⛴</option>
+					<option value="scooter">Скутер 🛵</option>
+					<option value="bank">Банк 💳</option>
+					<option value="restaurant">Ресторан 🍴</option>
+					<option value="post">Почта ✉</option>
+					<option value="castle">Замок 🏰</option>
+					<option value="ranger-station">Станция рейнджера 🌲</option>
+					<option value="water">Вода 💧</option>
+					<option value="triangle">Треугольник ▲</option>
+					<option value="cow">Корова 🐄</option>
+					<option value="bear">Медведь 🐻</option>
+					<option value="car-repair">Ремонт авто 🔧</option>
+					<option value="communications">Коммуникации 📡</option>
+					<option value="roadblock">Блокпост 🚧</option>
+					<option value="stadium">Стадион 🏟</option>
+					<option value="skull">Череп 💀</option>
+					<option value="rocket">Ракета 🚀</option>
+					<option value="bbq">BBQ 🍖</option>
+					<option value="ping">Пинг 📍</option>
+					<option value="circle">Круг ●</option>
+				</select>
+                <div class="search-buttons">
+                    <button id="searchBtn">Поиск</button>
+                    <div class="second-row-buttons">
+						<button id="bulkEditBtn" style="display:none;">Массовое редактирование</button>
+						<button id="exportFilteredToServersBtn" style="display:none;">Экспорт найденных</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="markers-list">
+                <div class="sort-controls">
+                    <h3>Мои метки</h3>
+                    <div class="sort-buttons">
+                        <button class="sort-btn" data-sort="name" title="Сортировка по имени">
+							<span>Имя</span>
+                        </button>
+                        <button class="sort-btn" data-sort="x" title="Сортировка по X координате">
+							<span>X</span>
+                        </button>
+                        <button class="sort-btn" data-sort="y" title="Сортировка по Y координате">
+							<span>Y</span>
+                        </button>
+                    </div>
+                </div>
+                <div id="markersContainer"></div>
+            </div>
+         
+            <!-- Кнопки управления видимостью -->
+            <div class="visibility-controls">
+                <button id="toggleMarkersBtn" class="toggle-markers-btn">Скрыть метки</button>
+                <button id="toggleNamesBtn" class="toggle-names-btn">Скрыть города</button>
+            </div>
+        </div>
+    </div>
+    <script src="shared/js/map-script-helpers.js"></script>
+    <script src="shared/js/map-bootstrap.js"></script>
+    <script>
+        (function () {
+            const mapId = window.DayzMapBootstrap.defaultMapId;
+            const mapName = window.DayzMapScriptHelpers.getMapName(mapId);
+            const pageTitle = `DayZ ${mapName}`;
+            const heading = document.querySelector(".header h1");
+
+            document.title = pageTitle;
+
+            if (heading) {
+                heading.textContent = pageTitle;
+            }
+
+            document.write(`<script src="${window.DayzMapScriptHelpers.getNamesDataPath(mapId)}"><\/script>`);
+        })();
+    </script>
+    <script src="js/map-nav.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="shared/js/users_profiles.js"></script>
+    <script src="shared/js/map-runtime-config.js"></script>
+    <script src="shared/js/map-core.js"></script>
+    <script src="shared/js/map_shapes.js"></script>
+    <script src="shared/js/measurement.js"></script>
+    <script src="shared/js/bulk_import.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Разделитель JSON по серверам</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>Разделитель JSON по серверам</h1>
+            <p>Загрузите JSON-файл для разделения по серверам</p>
+        </header>
+
+        <main class="main-content">
+            <div class="mode-selector">
+                <button id="splitMode" class="mode-button active">Разделить JSON</button>
+                <button id="mergeMode" class="mode-button">Объединить JSON</button>
+            </div>
+
+            <!-- Split Mode Content -->
+            <div id="splitContent" class="mode-content">
+                <div id="uploadArea" class="upload-area">
+                    <svg class="upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <p class="upload-text">Перетащите файл сюда или</p>
+                    <input type="file" id="fileInput" accept=".json" class="hidden">
+                    <button id="selectButton" class="select-button">Выберите файл</button>
+                    <p class="upload-hint">Поддерживаются только JSON-файлы</p>
+                </div>
+
+                <div id="fileInfo" class="file-info hidden">
+                    <svg class="file-info-icon" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                    </svg>
+                    <span id="fileInfoText" class="file-info-text"></span>
+                </div>
+
+                <div id="errorMessage" class="error-message hidden">
+                    <svg class="error-message-icon" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                    </svg>
+                    <span id="errorText" class="error-text"></span>
+                </div>
+
+                <div id="downloadSection" class="download-section hidden">
+                    <div class="download-header">
+                        <h2 class="download-title">Скачать файлы серверов</h2>
+                        <button id="downloadAllButton" class="download-all-button">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Скачать все
+                        </button>
+                    </div>
+                    <div id="downloadButtons" class="download-buttons">
+                        <!-- Buttons will be dynamically added here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Merge Mode Content -->
+            <div id="mergeContent" class="mode-content hidden">
+                <div id="mergeUploadArea" class="upload-area">
+                    <svg class="upload-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <p class="upload-text">Перетащите файлы сюда или</p>
+                    <input type="file" id="mergeFileInput" accept=".json" multiple class="hidden">
+                    <button id="mergeSelectButton" class="select-button">Выберите файлы</button>
+                    <p class="upload-hint">Выберите несколько JSON-файлов для объединения</p>
+                </div>
+
+                <div id="mergeFileInfo" class="file-info hidden">
+                    <svg class="file-info-icon" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+                    </svg>
+                    <span id="mergeFileInfoText" class="file-info-text"></span>
+                </div>
+
+                <div id="mergeErrorMessage" class="error-message hidden">
+                    <svg class="error-message-icon" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                    </svg>
+                    <span id="mergeErrorText" class="error-text"></span>
+                </div>
+
+                <div id="filesListContainer" class="files-list-container hidden">
+                    <div class="files-list-header">
+                        <h3>Порядок файлов для объединения:</h3>
+                        <button id="clearFilesButton" class="clear-files-button">Очистить список</button>
+                    </div>
+                    <div id="filesList" class="files-list">
+                        <!-- Files will be dynamically added here -->
+                    </div>
+                </div>
+
+                <div id="mergeDownloadSection" class="download-section hidden">
+                    <div class="download-header">
+                        <h2 class="download-title">Скачать объединенный файл</h2>
+                        <button id="mergeDownloadButton" class="download-all-button">
+                            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Скачать объединенный JSON
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Name mapping for known servers
+        const nameMapping = {
+            "109.248.4.32:2200": "PrivateMarkers_YW_chernarus-1",
+            "109.248.4.32:2206": "PrivateMarkers_YW_chernarus-2",
+            "109.248.4.106:2200": "PrivateMarkers_YW_chernarus-3",
+            "109.248.4.106:2206": "PrivateMarkers_YW_chernarus-4",
+            "109.248.4.32:2212": "PrivateMarkers_YW_deadfall-1",
+            "109.248.4.106:2212": "PrivateMarkers_YW_deadfall-2",
+            "109.248.4.32:2218": "PrivateMarkers_YW_dungeon-1",
+            "109.248.4.106:2218": "PrivateMarkers_YW_dungeon-2"
+        };
+
+        let processedFiles = [];
+        let mergedData = null;
+        let selectedFiles = []; // Array to store selected files with their order
+
+        // DOM elements - Split mode
+        const splitMode = document.getElementById('splitMode');
+        const mergeMode = document.getElementById('mergeMode');
+        const splitContent = document.getElementById('splitContent');
+        const mergeContent = document.getElementById('mergeContent');
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const selectButton = document.getElementById('selectButton');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileInfoText = document.getElementById('fileInfoText');
+        const errorMessage = document.getElementById('errorMessage');
+        const errorText = document.getElementById('errorText');
+        const downloadSection = document.getElementById('downloadSection');
+        const downloadButtons = document.getElementById('downloadButtons');
+        const downloadAllButton = document.getElementById('downloadAllButton');
+
+        // DOM elements - Merge mode
+        const mergeUploadArea = document.getElementById('mergeUploadArea');
+        const mergeFileInput = document.getElementById('mergeFileInput');
+        const mergeSelectButton = document.getElementById('mergeSelectButton');
+        const mergeFileInfo = document.getElementById('mergeFileInfo');
+        const mergeFileInfoText = document.getElementById('mergeFileInfoText');
+        const mergeErrorMessage = document.getElementById('mergeErrorMessage');
+        const mergeErrorText = document.getElementById('mergeErrorText');
+        const mergeDownloadSection = document.getElementById('mergeDownloadSection');
+        const mergeDownloadButton = document.getElementById('mergeDownloadButton');
+        
+        // DOM elements - Files list
+        const filesListContainer = document.getElementById('filesListContainer');
+        const filesList = document.getElementById('filesList');
+        const clearFilesButton = document.getElementById('clearFilesButton');
+
+        // Mode switching
+        splitMode.addEventListener('click', () => switchMode('split'));
+        mergeMode.addEventListener('click', () => switchMode('merge'));
+
+        function switchMode(mode) {
+            if (mode === 'split') {
+                splitMode.classList.add('active');
+                mergeMode.classList.remove('active');
+                splitContent.classList.remove('hidden');
+                mergeContent.classList.add('hidden');
+                document.querySelector('.header h1').textContent = 'Разделитель JSON по серверам';
+                document.querySelector('.header p').textContent = 'Загрузите JSON-файл для разделения по серверам';
+            } else {
+                mergeMode.classList.add('active');
+                splitMode.classList.remove('active');
+                mergeContent.classList.remove('hidden');
+                splitContent.classList.add('hidden');
+                document.querySelector('.header h1').textContent = 'Объединитель JSON файлов';
+                document.querySelector('.header p').textContent = 'Загрузите несколько JSON-файлов для объединения';
+            }
+        }
+
+        // Split mode event listeners
+        selectButton.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', handleFileSelect);
+
+        // Split mode drag and drop events
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('drag-active');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('drag-active');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('drag-active');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        // Merge mode event listeners
+        mergeSelectButton.addEventListener('click', () => mergeFileInput.click());
+        mergeFileInput.addEventListener('change', handleMergeFileSelect);
+
+        // Merge mode drag and drop events
+        mergeUploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            mergeUploadArea.classList.add('drag-active');
+        });
+
+        mergeUploadArea.addEventListener('dragleave', () => {
+            mergeUploadArea.classList.remove('drag-active');
+        });
+
+        mergeUploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            mergeUploadArea.classList.remove('drag-active');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleMergeFiles(files);
+            }
+        });
+
+        mergeUploadArea.addEventListener('click', () => mergeFileInput.click());
+
+        // Merge download button
+        mergeDownloadButton.addEventListener('click', downloadMergedFile);
+        
+        // Clear files button
+        clearFilesButton.addEventListener('click', clearFilesList);
+
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        }
+
+        function handleMergeFileSelect(e) {
+            const files = e.target.files;
+            if (files.length > 0) {
+                handleMergeFiles(files);
+            }
+        }
+
+        function handleFile(file) {
+            // Reset UI
+            hideMessages();
+            downloadSection.classList.add('hidden');
+            processedFiles = [];
+
+            // Validate file type
+            if (!file.name.toLowerCase().endsWith('.json')) {
+                showError('Пожалуйста, выберите JSON-файл');
+                return;
+            }
+
+            // Read and parse file
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const content = e.target.result;
+                    const jsonData = JSON.parse(content);
+
+                    // Validate structure
+                    if (!Array.isArray(jsonData)) {
+                        showError('Ошибка в структуре файла: ожидается массив на верхнем уровне');
+                        return;
+                    }
+
+                    processJsonData(jsonData, file.name);
+                } catch (error) {
+                    showError('Ошибка в структуре файла: невалидный JSON');
+                    console.error('JSON parsing error:', error);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function handleMergeFiles(files) {
+            // Reset UI
+            hideMergeMessages();
+            mergeDownloadSection.classList.add('hidden');
+            mergedData = [];
+
+            // Validate files
+            const jsonFiles = Array.from(files).filter(file => file.name.toLowerCase().endsWith('.json'));
+            
+            if (jsonFiles.length === 0) {
+                showMergeError('Пожалуйста, выберите хотя бы один JSON-файл');
+                return;
+            }
+
+            if (jsonFiles.length !== files.length) {
+                showMergeError('Некоторые файлы не являются JSON-файлами и будут проигнорированы');
+            }
+
+            // Add files to selected files array
+            jsonFiles.forEach(file => {
+                // Check if file already exists in the list
+                const existingIndex = selectedFiles.findIndex(f => f.file.name === file.name && f.file.size === file.size);
+                if (existingIndex === -1) {
+                    selectedFiles.push({
+                        file: file,
+                        id: Date.now() + Math.random(), // Unique ID
+                        servers: 0, // Will be updated after parsing
+                        parsed: false
+                    });
+                }
+            });
+
+            // Update files list display
+            updateFilesList();
+            
+            // Parse all files to get server count
+            parseSelectedFiles();
+        }
+
+        function updateFilesList() {
+            filesList.innerHTML = '';
+            
+            if (selectedFiles.length === 0) {
+                filesListContainer.classList.add('hidden');
+                return;
+            }
+            
+            filesListContainer.classList.remove('hidden');
+            
+            // Create placeholder if it doesn't exist
+            if (!placeholder) {
+                createPlaceholder();
+            }
+            
+            selectedFiles.forEach((fileObj, index) => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                fileItem.dataset.index = index;
+                fileItem.draggable = true;
+                
+                fileItem.innerHTML = `
+                    <svg class="drag-handle" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M9 3h2v2H9V3zm4 0h2v2h-2V3zM9 7h2v2H9V7zm4 0h2v2h-2V7zM9 11h2v2H9v-2zm4 0h2v2h-2v-2zM9 15h2v2H9v-2zm4 0h2v2h-2v-2zM9 19h2v2H9v-2zm4 0h2v2h-2v-2z"/>
+                    </svg>
+                    <div class="file-info">
+                        <div class="file-name">${fileObj.file.name}</div>
+                        <div class="file-details">
+                            <span class="file-size">${formatFileSize(fileObj.file.size)}</span>
+                            <span class="file-servers">${fileObj.servers} серверов</span>
+                        </div>
+                    </div>
+                    <button class="remove-file" data-index="${index}">
+                        <svg width="12" height="12" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                        </svg>
+                    </button>
+                `;
+                
+                // Add drag and drop event listeners
+                fileItem.addEventListener('dragstart', handleDragStart);
+                fileItem.addEventListener('dragover', handleDragOver);
+                fileItem.addEventListener('drop', handleDrop);
+                fileItem.addEventListener('dragend', handleDragEnd);
+                fileItem.addEventListener('dragenter', handleDragEnter);
+                fileItem.addEventListener('dragleave', handleDragLeave);
+                
+                // Add remove button event listener
+                const removeButton = fileItem.querySelector('.remove-file');
+                removeButton.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    removeFile(index);
+                });
+                
+                filesList.appendChild(fileItem);
+            });
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            updateFilesList();
+            if (selectedFiles.length > 0) {
+                parseSelectedFiles();
+            } else {
+                mergeDownloadSection.classList.add('hidden');
+                mergeFileInfo.classList.add('hidden');
+            }
+        }
+
+        function clearFilesList() {
+            selectedFiles = [];
+            mergedData = [];
+            updateFilesList();
+            mergeDownloadSection.classList.add('hidden');
+            mergeFileInfo.classList.add('hidden');
+            hideMergeMessages();
+        }
+
+        function parseSelectedFiles() {
+            mergedData = [];
+            let filesParsed = 0;
+            
+            selectedFiles.forEach((fileObj, index) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const content = e.target.result;
+                        const jsonData = JSON.parse(content);
+                        
+                        let serverCount = 0;
+                        if (Array.isArray(jsonData)) {
+                            serverCount = jsonData.length;
+                            // Add all server objects from this file to merged data with order tracking
+                            jsonData.forEach(serverObj => {
+                                mergedData.push({
+                                    ...serverObj,
+                                    _fileOrder: index,
+                                    _fileName: fileObj.file.name
+                                });
+                            });
+                        }
+                        
+                        // Update file object with server count
+                        selectedFiles[index].servers = serverCount;
+                        selectedFiles[index].parsed = true;
+                        
+                    } catch (error) {
+                        console.error(`Error parsing file ${fileObj.file.name}:`, error);
+                        selectedFiles[index].parsed = false;
+                    }
+                    
+                    filesParsed++;
+                    if (filesParsed === selectedFiles.length) {
+                        // All files parsed, update display and show merge section
+                        updateFilesList();
+                        processMergeData(selectedFiles.length);
+                    }
+                };
+                reader.readAsText(fileObj.file);
+            });
+        }
+
+        // Drag and Drop functions
+        let draggedElement = null;
+        let draggedIndex = null;
+        let placeholder = null;
+
+        function handleDragStart(e) {
+            draggedElement = this;
+            draggedIndex = parseInt(this.dataset.index);
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/html', this.innerHTML);
+        }
+
+        function handleDragOver(e) {
+            if (e.preventDefault) {
+                e.preventDefault();
+            }
+            e.dataTransfer.dropEffect = 'move';
+            
+            const afterElement = getDragAfterElement(filesList, e.clientY);
+            if (afterElement == null) {
+                filesList.appendChild(placeholder);
+            } else {
+                filesList.insertBefore(placeholder, afterElement);
+            }
+            
+            return false;
+        }
+
+        function getDragAfterElement(container, y) {
+            const draggableElements = [...container.querySelectorAll('.file-item:not(.dragging)')];
+            
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = y - box.top - box.height / 2;
+                
+                if (offset < 0 && offset > closest.offset) {
+                    return { offset: offset, element: child };
+                } else {
+                    return closest;
+                }
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+
+        function handleDragEnter(e) {
+            if (this !== draggedElement) {
+                // Remove all drag-over classes first
+                document.querySelectorAll('.file-item').forEach(item => {
+                    item.classList.remove('drag-over', 'drag-over-above', 'drag-over-below');
+                });
+                
+                // Calculate if we're in the top or bottom half of the element
+                const rect = this.getBoundingClientRect();
+                const midY = rect.top + rect.height / 2;
+                const mouseY = e.clientY;
+                
+                if (mouseY < midY) {
+                    this.classList.add('drag-over-above');
+                } else {
+                    this.classList.add('drag-over-below');
+                }
+            }
+        }
+
+        function handleDragLeave(e) {
+            this.classList.remove('drag-over', 'drag-over-above', 'drag-over-below');
+        }
+
+        function handleDrop(e) {
+            if (e.stopPropagation) {
+                e.stopPropagation();
+            }
+            
+            if (draggedElement !== this) {
+                const dropIndex = parseInt(this.dataset.index);
+                
+                // Calculate if we should insert before or after
+                const rect = this.getBoundingClientRect();
+                const midY = rect.top + rect.height / 2;
+                const mouseY = e.clientY;
+                
+                let targetIndex = dropIndex;
+                if (mouseY > midY) {
+                    targetIndex = dropIndex + 1;
+                }
+                
+                // Reorder the selectedFiles array
+                const draggedFile = selectedFiles[draggedIndex];
+                selectedFiles.splice(draggedIndex, 1);
+                
+                // Adjust target index if we're moving an element before the target
+                if (draggedIndex < targetIndex) {
+                    targetIndex--;
+                }
+                
+                selectedFiles.splice(targetIndex, 0, draggedFile);
+                
+                // Update the display
+                updateFilesList();
+                
+                // Re-parse files to update merged data order
+                parseSelectedFiles();
+            }
+            
+            // Remove placeholder if it exists
+            if (placeholder && placeholder.parentNode) {
+                placeholder.parentNode.removeChild(placeholder);
+            }
+            
+            return false;
+        }
+
+        function handleDragEnd(e) {
+            // Clean up all drag-related classes
+            document.querySelectorAll('.file-item').forEach(item => {
+                item.classList.remove('dragging', 'drag-over', 'drag-over-above', 'drag-over-below');
+            });
+            
+            // Remove placeholder if it exists
+            if (placeholder && placeholder.parentNode) {
+                placeholder.parentNode.removeChild(placeholder);
+            }
+            
+            draggedElement = null;
+            draggedIndex = null;
+            placeholder = null;
+        }
+
+        // Create placeholder element
+        function createPlaceholder() {
+            placeholder = document.createElement('div');
+            placeholder.className = 'drag-placeholder';
+        }
+
+        function processMergeData(fileCount) {
+            if (mergedData.length === 0) {
+                showMergeError('Не удалось извлечь данные из файлов. Проверьте структуру JSON-файлов.');
+                return;
+            }
+
+            // Show success message
+            mergeFileInfoText.textContent = `Загружено файлов: ${fileCount}. Найдено серверов: ${mergedData.length}`;
+            mergeFileInfo.classList.remove('hidden');
+            mergeDownloadSection.classList.remove('hidden');
+        }
+
+        function processJsonData(jsonData, fileName) {
+            const serverCount = jsonData.length;
+            
+            // Show success message
+            fileInfoText.textContent = `Файл ${fileName} загружен. Найдено серверов: ${serverCount}`;
+            fileInfo.classList.remove('hidden');
+
+            // Process each server object - сохраняем ВСЕ объекты
+            processedFiles = jsonData.map((serverObj, index) => {
+                const param1 = serverObj.param1;
+                
+                // Generate filename - всегда создаем имя файла
+                let fileName;
+                if (param1 && nameMapping[param1]) {
+                    fileName = nameMapping[param1] + '.json';
+                } else if (param1) {
+                    // Clean param1 for filename (replace : with -)
+                    const cleanParam1 = param1.replace(/:/g, '-');
+                    fileName = `PrivateMarkers_${cleanParam1}.json`;
+                } else {
+                    // Fallback имя если нет param1
+                    fileName = `server_${index}.json`;
+                }
+
+                return {
+                    name: fileName,
+                    displayName: fileName.replace('.json', ''),
+                    content: JSON.stringify([serverObj], null, 2)
+                };
+            }); // УБРАЛИ .filter() - теперь сохраняем все объекты
+
+            // Create download buttons
+            createDownloadButtons();
+            downloadSection.classList.remove('hidden');
+        }
+
+        function createDownloadButtons() {
+            downloadButtons.innerHTML = '';
+
+            processedFiles.forEach((file, index) => {
+                const button = document.createElement('button');
+                button.className = 'download-button';
+                button.innerHTML = `
+                    <div class="download-button-content">
+                        <span class="download-button-name">${file.displayName}</span>
+                        <span class="download-button-hint">Скачать JSON</span>
+                    </div>
+                `;
+                button.addEventListener('click', () => downloadFile(file));
+                downloadButtons.appendChild(button);
+            });
+        }
+
+        function downloadFile(file) {
+            const blob = new Blob([file.content], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = file.name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function downloadMergedFile() {
+            if (!mergedData || mergedData.length === 0) {
+                showMergeError('Нет данных для скачивания');
+                return;
+            }
+
+            // Sort merged data by file order to preserve original file selection order
+            const sortedData = [...mergedData].sort((a, b) => {
+                if (a._fileOrder !== undefined && b._fileOrder !== undefined) {
+                    return a._fileOrder - b._fileOrder;
+                }
+                return 0;
+            });
+
+            // Remove temporary order tracking fields before creating JSON
+            const cleanData = sortedData.map(item => {
+                const { _fileOrder, _fileName, ...cleanItem } = item;
+                return cleanItem;
+            });
+
+            const content = JSON.stringify(cleanData, null, 2);
+            const blob = new Blob([content], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'merged_servers.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // Download all files
+        downloadAllButton.addEventListener('click', () => {
+            processedFiles.forEach(file => {
+                setTimeout(() => downloadFile(file), 100);
+            });
+        });
+
+        function showError(message) {
+            errorText.textContent = message;
+            errorMessage.classList.remove('hidden');
+        }
+
+        function showMergeError(message) {
+            mergeErrorText.textContent = message;
+            mergeErrorMessage.classList.remove('hidden');
+        }
+
+        function hideMessages() {
+            fileInfo.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+        }
+
+        function hideMergeMessages() {
+            mergeFileInfo.classList.add('hidden');
+            mergeErrorMessage.classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
