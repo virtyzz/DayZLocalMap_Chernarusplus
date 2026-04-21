@@ -9,10 +9,10 @@
 ! Импорт и Экспорт подогнан под метки lbmaster (lbgroup)
 
 ### Актуальная web-версия всегда есть тут: 
-- [Черно | DeerIsle | Deadfall](https://dayzmap.silthost.ru)
+- [Черно | DeerIsle | Deadfall](https://dayz-map.ru)
 
 ### Полное руководство пользователя:
-- https://dayzmap.silthost.ru/shared/guide/user_guide.html
+- https://dayz-map.ru/shared/guide/user_guide.html
 
 ### Кратко про лицензию:
 - ✅ Дорабатывать — можно

@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Конвертер игровой валюты</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            color: #333;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 600px;
+            width: 100%;
+            background-color: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(to right, #1a2a6c, #b21f1f);
+            color: white;
+            padding: 25px 20px;
+            text-align: center;
+            position: relative;
+        }
+        
+        .header h1 {
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+        
+        .settings-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            color: white;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .settings-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: rotate(90deg);
+        }
+        
+        .content {
+            padding: 25px;
+        }
+        
+        .converter-block {
+            margin-bottom: 30px;
+            padding: 20px;
+            border-radius: 10px;
+            background-color: #f9f9f9;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        
+        .converter-title {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            font-weight: 600;
+            color: #1a2a6c;
+            font-size: 1.2rem;
+        }
+        
+        .currency-icon {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+            font-weight: bold;
+            color: white;
+        }
+        
+        .rub-icon {
+            background-color: #b21f1f;
+        }
+        
+        .dollar-icon {
+            background-color: #1a2a6c;
+        }
+        
+        .crystal-icon {
+            background-color: #6a0dad;
+        }
+        
+        .input-group {
+            display: flex;
+            margin-bottom: 10px;
+        }
+        
+        input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus {
+            border-color: #1a2a6c;
+            outline: none;
+        }
+        
+        .currency-label {
+            background-color: #1a2a6c;
+            color: white;
+            padding: 12px 15px;
+            border-radius: 8px;
+            font-weight: 600;
+            min-width: 80px;
+            text-align: center;
+            margin-left: 10px;
+        }
+        
+        .crystal-label {
+            background-color: #6a0dad;
+        }
+        
+        .conversion-rate {
+            font-size: 0.9rem;
+            color: #666;
+            text-align: center;
+            padding: 8px;
+            background-color: #f0f0f0;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        
+        .divider {
+            height: 20px;
+        }
+        
+        .settings-panel {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+        
+        .settings-panel h3 {
+            margin-bottom: 15px;
+            color: #1a2a6c;
+            text-align: center;
+        }
+        
+        .settings-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .settings-input-group {
+            display: flex;
+            align-items: center;
+        }
+        
+        .settings-input-group label {
+            min-width: 150px;
+            font-weight: 500;
+        }
+        
+        .settings-input-group input {
+            flex: 1;
+        }
+        
+        .settings-buttons {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        
+        .settings-buttons button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .save-btn {
+            background-color: #1a2a6c;
+            color: white;
+        }
+        
+        .save-btn:hover {
+            background-color: #0f1a4a;
+        }
+        
+        .reset-btn {
+            background-color: #fdbb2d;
+            color: #333;
+        }
+        
+        .reset-btn:hover {
+            background-color: #f7a800;
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 15px;
+            background-color: #f5f5f5;
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        @media (max-width: 480px) {
+            .header h1 {
+                font-size: 1.5rem;
+            }
+            
+            .content {
+                padding: 20px 15px;
+            }
+            
+            .input-group {
+                flex-direction: column;
+            }
+            
+            .currency-label {
+                margin-left: 0;
+                margin-top: 10px;
+            }
+            
+            .settings-input-group {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .settings-input-group label {
+                margin-bottom: 5px;
+            }
+        }
+    </style>
+    <base target="_blank" rel="noopener noreferrer">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Конвертер игровой валюты</h1>
+            <p>Перевод между российскими рублями и игровой валютой</p>
+            <button class="settings-btn" id="settingsBtn">⚙️</button>
+        </div>
+        
+        <div class="content">
+            <!-- Панель настроек курсов -->
+            <div class="settings-panel" id="settingsPanel">
+                <h3>Настройка курсов обмена</h3>
+                <div class="settings-group">
+                    <div class="settings-input-group">
+                        <label for="rubToGameRubRate">1000 RUB = </label>
+                        <input type="number" id="rubToGameRubRate" min="1" placeholder="150000000">
+                        <span style="margin-left: 10px;">игровых рублей</span>
+                    </div>
+                    <div class="settings-input-group">
+                        <label for="rubToGameDollarRate">1000 RUB = </label>
+                        <input type="number" id="rubToGameDollarRate" min="1" placeholder="1000000">
+                        <span style="margin-left: 10px;">игровых долларов</span>
+                    </div>
+                    <div class="settings-input-group">
+                        <label for="crystalToGameRubRate">1 Кристалл = </label>
+                        <input type="number" id="crystalToGameRubRate" min="1" placeholder="500000">
+                        <span style="margin-left: 10px;">игровых рублей</span>
+                    </div>
+                    <div class="settings-input-group">
+                        <label for="crystalToGameDollarRate">1 Кристалл = </label>
+                        <input type="number" id="crystalToGameDollarRate" min="1" placeholder="2500">
+                        <span style="margin-left: 10px;">игровых долларов</span>
+                    </div>
+                </div>
+                <div class="settings-buttons">
+                    <button class="save-btn" id="saveSettings">Сохранить</button>
+                    <button class="reset-btn" id="resetSettings">Сбросить</button>
+                </div>
+            </div>
+            
+            <!-- Конвертер для рублей -->
+            <div class="converter-block">
+                <div class="converter-title">
+                    <div class="currency-icon rub-icon">₽</div>
+                    <span>Российские рубли ↔ Игровая валюта</span>
+                </div>
+
+                <div class="input-group">
+                    <input type="number" id="rubInput" min="0" placeholder="Российские рубли">
+                    <div class="currency-label">RUB</div>
+                </div>
+
+                <div class="input-group">
+                    <input type="text" id="gameRubInput" placeholder="Игровые рубли">
+                    <div class="currency-label">G₽</div>
+                </div>
+
+                <div class="input-group">
+                    <input type="text" id="gameDollarInput" placeholder="Игровые доллары">
+                    <div class="currency-label">G$</div>
+                </div>
+
+                <div class="conversion-rate" id="rubToGameRate">
+                    1000 RUB = 150,000,000 G₽ = 1,000,000 G$
+                </div>
+            </div>
+
+            <div class="divider"></div>
+            
+            <!-- Конвертер для кристаллов -->
+            <div class="converter-block">
+                <div class="converter-title">
+                    <div class="currency-icon crystal-icon">✦</div>
+                    <span>Кристаллы ↔ Игровая валюта</span>
+                </div>
+                
+                <div class="input-group">
+                    <input type="number" id="crystalInput" min="0" placeholder="Количество кристаллов">
+                    <div class="currency-label crystal-label">✦</div>
+                </div>
+                
+                <div class="input-group">
+                    <input type="text" id="crystalToGameRubInput" placeholder="Игровые рубли">
+                    <div class="currency-label">G₽</div>
+                </div>
+                
+                <div class="input-group">
+                    <input type="text" id="crystalToGameDollarInput" placeholder="Игровые доллары">
+                    <div class="currency-label">G$</div>
+                </div>
+                
+                <div class="conversion-rate" id="crystalToGameRate">
+                    1 Кристалл = 500,000 G₽ = 2,500 G$
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p><a href="https://discord.com/channels/1191479186062319735/1211802852314447953/1399366641145610268">Курс "Российские рубли ↔ Игровая валюта" взят из дискорда YourWorld Dayz PVE</a></p>
+			<p>Курс на кристаллы устанавливают игроки</p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Элементы для конвертера рублей
+            const rubInput = document.getElementById('rubInput');
+            const gameRubInput = document.getElementById('gameRubInput');
+            const gameDollarInput = document.getElementById('gameDollarInput');
+            
+            // Элементы для конвертера кристаллов
+            const crystalInput = document.getElementById('crystalInput');
+            const crystalToGameRubInput = document.getElementById('crystalToGameRubInput');
+            const crystalToGameDollarInput = document.getElementById('crystalToGameDollarInput');
+            
+            // Элементы для настроек
+            const settingsBtn = document.getElementById('settingsBtn');
+            const settingsPanel = document.getElementById('settingsPanel');
+            const rubToGameRubRateInput = document.getElementById('rubToGameRubRate');
+            const rubToGameDollarRateInput = document.getElementById('rubToGameDollarRate');
+            const crystalToGameRubRateInput = document.getElementById('crystalToGameRubRate');
+            const crystalToGameDollarRateInput = document.getElementById('crystalToGameDollarRate');
+            const saveSettingsBtn = document.getElementById('saveSettings');
+            const resetSettingsBtn = document.getElementById('resetSettings');
+            
+            // Элементы для отображения курсов
+            const rubToGameRateDisplay = document.getElementById('rubToGameRate');
+            const crystalToGameRateDisplay = document.getElementById('crystalToGameRate');
+            
+            // Курсы обмена (по умолчанию)
+            let rubToGameRubRate = 150000000 / 1000; // 150,000,000 игровых рублей за 1000 RUB
+            let rubToGameDollarRate = 1000000 / 1000; // 1,000,000 игровых долларов за 1000 RUB
+            let crystalToGameRubRate = 500000; // 500,000 игровых рублей за 1 кристалл
+            let crystalToGameDollarRate = 2500; // 2,500 игровых долларов за 1 кристалл
+            
+            // Загружаем сохраненные настройки из localStorage
+            function loadSettings() {
+                const savedRubRate = localStorage.getItem('rubToGameRubRate');
+                const savedDollarRate = localStorage.getItem('rubToGameDollarRate');
+                const savedCrystalToRubRate = localStorage.getItem('crystalToGameRubRate');
+                const savedCrystalToDollarRate = localStorage.getItem('crystalToGameDollarRate');
+                
+                if (savedRubRate) {
+                    rubToGameRubRate = parseFloat(savedRubRate);
+                    rubToGameRubRateInput.value = Math.round(rubToGameRubRate * 1000);
+                } else {
+                    rubToGameRubRateInput.value = 150000000;
+                }
+                
+                if (savedDollarRate) {
+                    rubToGameDollarRate = parseFloat(savedDollarRate);
+                    rubToGameDollarRateInput.value = Math.round(rubToGameDollarRate * 1000);
+                } else {
+                    rubToGameDollarRateInput.value = 1000000;
+                }
+                
+                if (savedCrystalToRubRate) {
+                    crystalToGameRubRate = parseFloat(savedCrystalToRubRate);
+                    crystalToGameRubRateInput.value = crystalToGameRubRate;
+                } else {
+                    crystalToGameRubRateInput.value = 500000;
+                }
+                
+                if (savedCrystalToDollarRate) {
+                    crystalToGameDollarRate = parseFloat(savedCrystalToDollarRate);
+                    crystalToGameDollarRateInput.value = crystalToGameDollarRate;
+                } else {
+                    crystalToGameDollarRateInput.value = 2500;
+                }
+                
+                updateRateDisplays();
+            }
+            
+            // Сохраняем настройки в localStorage
+            function saveSettings() {
+                const newRubRate = parseFloat(rubToGameRubRateInput.value) / 1000;
+                const newDollarRate = parseFloat(rubToGameDollarRateInput.value) / 1000;
+                const newCrystalToRubRate = parseFloat(crystalToGameRubRateInput.value);
+                const newCrystalToDollarRate = parseFloat(crystalToGameDollarRateInput.value);
+                
+                if (newRubRate > 0 && newDollarRate > 0 && newCrystalToRubRate > 0 && newCrystalToDollarRate > 0) {
+                    rubToGameRubRate = newRubRate;
+                    rubToGameDollarRate = newDollarRate;
+                    crystalToGameRubRate = newCrystalToRubRate;
+                    crystalToGameDollarRate = newCrystalToDollarRate;
+                    
+                    localStorage.setItem('rubToGameRubRate', rubToGameRubRate.toString());
+                    localStorage.setItem('rubToGameDollarRate', rubToGameDollarRate.toString());
+                    localStorage.setItem('crystalToGameRubRate', crystalToGameRubRate.toString());
+                    localStorage.setItem('crystalToGameDollarRate', crystalToGameDollarRate.toString());
+                    
+                    updateRateDisplays();
+                    recalculateAll();
+                    
+                    // Закрываем панель настроек
+                    settingsPanel.style.display = 'none';
+                    
+                    alert('Настройки сохранены!');
+                } else {
+                    alert('Пожалуйста, введите корректные значения курсов.');
+                }
+            }
+            
+            // Сбрасываем настройки к значениям по умолчанию
+            function resetSettings() {
+                rubToGameRubRate = 150000000 / 1000;
+                rubToGameDollarRate = 1000000 / 1000;
+                crystalToGameRubRate = 500000;
+                crystalToGameDollarRate = 2500;
+                
+                rubToGameRubRateInput.value = 150000000;
+                rubToGameDollarRateInput.value = 1000000;
+                crystalToGameRubRateInput.value = 500000;
+                crystalToGameDollarRateInput.value = 2500;
+                
+                localStorage.removeItem('rubToGameRubRate');
+                localStorage.removeItem('rubToGameDollarRate');
+                localStorage.removeItem('crystalToGameRubRate');
+                localStorage.removeItem('crystalToGameDollarRate');
+                
+                updateRateDisplays();
+                recalculateAll();
+                
+                alert('Настройки сброшены к значениям по умолчанию!');
+            }
+            
+            // Обновляем отображение курсов
+            function updateRateDisplays() {
+                const formattedRubRate = formatNumber(Math.round(rubToGameRubRate * 1000));
+                const formattedDollarRate = formatNumber(Math.round(rubToGameDollarRate * 1000));
+                const formattedCrystalToRub = formatNumber(crystalToGameRubRate);
+                const formattedCrystalToDollar = formatNumber(crystalToGameDollarRate);
+                
+                rubToGameRateDisplay.textContent = `1000 RUB = ${formattedRubRate} G₽ = ${formattedDollarRate} G$`;
+                crystalToGameRateDisplay.textContent = `1 Кристалл = ${formattedCrystalToRub} G₽ = ${formattedCrystalToDollar} G$`;
+            }
+            
+            // Пересчитываем все значения при изменении курсов
+            function recalculateAll() {
+                if (rubInput.value) {
+                    rubInput.dispatchEvent(new Event('input'));
+                }
+                if (gameRubInput.value) {
+                    gameRubInput.dispatchEvent(new Event('input'));
+                }
+                if (gameDollarInput.value) {
+                    gameDollarInput.dispatchEvent(new Event('input'));
+                }
+                if (crystalInput.value) {
+                    crystalInput.dispatchEvent(new Event('input'));
+                }
+            }
+            
+            // Функция для форматирования чисел с пробелами
+            function formatNumber(num) {
+                return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+            }
+            
+            // Функция для удаления форматирования (пробелов) из числа
+            function unformatNumber(str) {
+                return str.replace(/\s/g, '');
+            }
+            
+            // Конвертер для рублей
+            // Из рублей в игровую валюту
+            rubInput.addEventListener('input', function() {
+                const rubValue = parseFloat(rubInput.value) || 0;
+                const gameRubValue = rubValue * rubToGameRubRate;
+                const gameDollarValue = rubValue * rubToGameDollarRate;
+                gameRubInput.value = formatNumber(Math.round(gameRubValue));
+                gameDollarInput.value = formatNumber(Math.round(gameDollarValue));
+            });
+            
+            // Из игровых рублей в рубли
+            gameRubInput.addEventListener('input', function() {
+                const gameRubValue = parseFloat(unformatNumber(gameRubInput.value)) || 0;
+                const rubValue = gameRubValue / rubToGameRubRate;
+                const gameDollarValue = rubValue * rubToGameDollarRate;
+                rubInput.value = rubValue.toFixed(2);
+                gameDollarInput.value = formatNumber(Math.round(gameDollarValue));
+            });
+            
+            // Из игровых долларов в рубли
+            gameDollarInput.addEventListener('input', function() {
+                const gameDollarValue = parseFloat(unformatNumber(gameDollarInput.value)) || 0;
+                const rubValue = gameDollarValue / rubToGameDollarRate;
+                const gameRubValue = rubValue * rubToGameRubRate;
+                rubInput.value = rubValue.toFixed(2);
+                gameRubInput.value = formatNumber(Math.round(gameRubValue));
+            });
+            
+            // Конвертер для кристаллов
+            // Из кристаллов в игровую валюту
+            crystalInput.addEventListener('input', function() {
+                const crystalValue = parseFloat(crystalInput.value) || 0;
+                const gameRubValue = crystalValue * crystalToGameRubRate;
+                const gameDollarValue = crystalValue * crystalToGameDollarRate;
+                
+                crystalToGameRubInput.value = formatNumber(Math.round(gameRubValue));
+                crystalToGameDollarInput.value = formatNumber(Math.round(gameDollarValue));
+            });
+            
+            // Из игровых рублей в кристаллы
+            crystalToGameRubInput.addEventListener('input', function() {
+                const gameRubValue = parseFloat(unformatNumber(crystalToGameRubInput.value)) || 0;
+                const crystalValue = gameRubValue / crystalToGameRubRate;
+                const gameDollarValue = crystalValue * crystalToGameDollarRate;
+                
+                crystalInput.value = crystalValue.toFixed(2);
+                crystalToGameDollarInput.value = formatNumber(Math.round(gameDollarValue));
+            });
+            
+            // Из игровых долларов в кристаллы
+            crystalToGameDollarInput.addEventListener('input', function() {
+                const gameDollarValue = parseFloat(unformatNumber(crystalToGameDollarInput.value)) || 0;
+                const crystalValue = gameDollarValue / crystalToGameDollarRate;
+                const gameRubValue = crystalValue * crystalToGameRubRate;
+                
+                crystalInput.value = crystalValue.toFixed(2);
+                crystalToGameRubInput.value = formatNumber(Math.round(gameRubValue));
+            });
+            
+            // Открытие/закрытие панели настроек
+            settingsBtn.addEventListener('click', function() {
+                if (settingsPanel.style.display === 'block') {
+                    settingsPanel.style.display = 'none';
+                } else {
+                    settingsPanel.style.display = 'block';
+                    loadSettings();
+                }
+            });
+            
+            // Сохранение настроек
+            saveSettingsBtn.addEventListener('click', saveSettings);
+            
+            // Сброс настроек
+            resetSettingsBtn.addEventListener('click', resetSettings);
+            
+            // Инициализация с примером
+            loadSettings();
+            rubInput.value = 1000;
+            rubInput.dispatchEvent(new Event('input'));
+            
+            crystalInput.value = 1;
+            crystalInput.dispatchEvent(new Event('input'));
+        });
+    </script>
+</body>
+</html>

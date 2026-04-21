@@ -1386,7 +1386,7 @@ class DayZMap {
 				const currencyConverterBtn = document.getElementById('currencyConverterBtn');
 				if (currencyConverterBtn) {
 					currencyConverterBtn.addEventListener('click', () => {
-						window.open('https://ywconverter.silthost.ru/', '_blank');
+						window.open(window.DayzMapScriptHelpers.getAssetPath('shared/converter/index.html'), '_blank');
 						toolsDropdownMenu.classList.remove('show');
 						toolsDropdownBtn.classList.remove('active');
 					});
