@@ -442,6 +442,7 @@ class DayZMap {
         this.loadSearchHistory(); // Загружаем историю поиска
         this.loadTheme(); // Загружаем тему
         this.initMap();
+        this.setupMobileMapTouchGuards();
         this.initProfiles(); // Инициализируем менеджер профилей ПЕРЕД загрузкой меток
         this.bindEvents();
     }
@@ -494,6 +495,57 @@ class DayZMap {
 		// Загружаем сетку и названия независимо от тайлов
 		this.addGrid();
 		this.initNames();
+	}
+
+	setupMobileMapTouchGuards() {
+		const mapElement = document.getElementById('map');
+		if (!mapElement) {
+			return;
+		}
+
+		const isCoarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+		const isMobileViewport = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+		const hasTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+		if (!hasTouch || (!isCoarsePointer && !isMobileViewport)) {
+			return;
+		}
+
+		let interactionScrollX = 0;
+		let interactionScrollY = 0;
+		let isTouchInteracting = false;
+
+		const preserveScrollPosition = () => {
+			window.scrollTo(interactionScrollX, interactionScrollY);
+		};
+
+		mapElement.addEventListener('touchstart', () => {
+			interactionScrollX = window.scrollX;
+			interactionScrollY = window.scrollY;
+			isTouchInteracting = true;
+		}, { passive: true });
+
+		mapElement.addEventListener('touchend', () => {
+			if (!isTouchInteracting) {
+				return;
+			}
+
+			requestAnimationFrame(() => {
+				preserveScrollPosition();
+				requestAnimationFrame(preserveScrollPosition);
+			});
+
+			isTouchInteracting = false;
+		}, { passive: true });
+
+		mapElement.addEventListener('touchcancel', () => {
+			if (!isTouchInteracting) {
+				return;
+			}
+
+			requestAnimationFrame(preserveScrollPosition);
+			isTouchInteracting = false;
+		}, { passive: true });
 	}
 
 	initProfiles() {

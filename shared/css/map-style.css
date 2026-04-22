@@ -2521,6 +2521,7 @@ input[type="number"]::-webkit-outer-spin-button:hover {
 @media (max-width: 768px) {
     body {
         overflow: auto;
+        overscroll-behavior-y: contain;
     }
 
     .container {
@@ -2535,10 +2536,26 @@ input[type="number"]::-webkit-outer-spin-button:hover {
     .map-container {
         flex: 1;
         min-height: 400px;
+        overscroll-behavior: contain;
     }
 
     #map {
         height: 400px;
+        overscroll-behavior: contain;
+        touch-action: none;
+    }
+
+    .leaflet-container {
+        overscroll-behavior: contain;
+        touch-action: none;
+    }
+
+    .leaflet-container,
+    .leaflet-pane,
+    .leaflet-control-container {
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
     }
 
     .sidebar {
@@ -2555,17 +2572,26 @@ input[type="number"]::-webkit-outer-spin-button:hover {
     .header {
         flex-direction: column;
         align-items: center;
+        gap: 12px;
+        padding:
+            calc(10px + env(safe-area-inset-top, 0px))
+            12px
+            12px;
     }
 
     .header h1 {
         text-align: center;
-        margin-bottom: 10px;
+        margin-bottom: 0;
+        width: 100%;
     }
 
     .controls {
-        flex-direction: row;
-        flex-wrap: wrap;
-        justify-content: center;
+        flex-direction: column;
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+        align-items: stretch;
+        width: 100%;
+        gap: 10px;
     }
 
     .controls-row,
@@ -2576,20 +2602,94 @@ input[type="number"]::-webkit-outer-spin-button:hover {
     
     .controls input {
         min-width: auto;
+        width: 100%;
+    }
+
+    .controls select {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .controls button {
+        width: 100%;
+        min-height: 40px;
+    }
+
+    .controls > button,
+    .controls > input,
+    .controls > select,
+    .controls > .profiles-container,
+    .controls > .coord-inputs,
+    .controls > .tools-dropdown {
+        width: min(100%, 320px);
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .controls #addMarkerBtn,
+    .controls #clearMarkersBtn {
+        width: 100%;
+    }
+
+    .controls > .profiles-container,
+    .controls > .coord-inputs,
+    .controls > .tools-dropdown {
+        width: 100%;
+    }
+
+    .profiles-container {
+        margin-right: 0;
+        padding-right: 0;
+        border-right: none;
+        width: 100%;
+        justify-content: center;
+    }
+
+    .profiles-controls {
+        width: 100%;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    .profiles-controls select {
+        min-width: 0;
+        width: min(100%, 320px);
+        margin-left: auto;
+        margin-right: auto;
+        flex: 1 1 100%;
+    }
+
+    .profiles-controls button {
+        flex: 0 0 32px;
+        width: 32px;
+        height: 32px;
+    }
+
+    .controls select#themeSelector,
+    .dropdown-btn {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        min-height: 40px !important;
     }
     
     .control-separator {
         width: 100%;
         height: 1px;
-        margin: 4px 0;
+        margin: 2px auto;
         background: #555;
+        max-width: 320px;
     }
     
     .coord-inputs {
         flex-direction: column;
-        gap: 5px;
+        gap: 8px;
+        align-items: stretch;
+        width: 100%;
     }
     
+    .coord-inputs input,
     .coord-inputs input[type="text"] {
         width: 100%;
     }
@@ -2598,24 +2698,104 @@ input[type="number"]::-webkit-outer-spin-button:hover {
         width: 100%;
     }
 
+    .coord-inputs > input,
+    .coord-inputs > button:not(.help-btn),
+    .coord-inputs > select {
+        width: min(100%, 320px);
+        margin-left: auto;
+        margin-right: auto;
+        min-height: 40px;
+    }
+
+    .coord-inputs .help-btn {
+        align-self: center;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        width: 24px !important;
+        min-width: 24px !important;
+        max-width: 24px !important;
+        height: 24px !important;
+        min-height: 24px !important;
+        max-height: 24px !important;
+        padding: 0 !important;
+        flex: 0 0 24px;
+    }
+
     /* Адаптация блока ввода координат для мобильных */
     #coordsInputsBlock {
-        min-width: 200px;
+        min-width: 0;
+        width: min(100%, 320px);
+        max-width: calc(100vw - 24px);
+        left: 50% !important;
+        transform: translateX(-50%);
     }
 
     .coords-row {
+        display: flex;
+        flex-wrap: wrap;
         gap: 6px;
         margin-bottom: 6px;
     }
 
     .coords-row input {
+        flex: 1 1 120px;
         padding: 6px;
         font-size: 0.85rem;
     }
 
     .coords-row button {
+        flex: 1 1 100%;
         padding: 6px 8px;
         font-size: 0.85rem;
+    }
+
+    .tools-dropdown {
+        width: 100%;
+    }
+
+    .dropdown-menu {
+        left: 0;
+        right: 0;
+        min-width: 0;
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .markers-search,
+    .markers-list,
+    .visibility-controls {
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+
+    .markers-list {
+        min-height: 0;
+    }
+
+    #markersContainer {
+        padding-right: 0;
+        max-height: 220px;
+    }
+
+    .sort-controls {
+        gap: 8px;
+    }
+
+    .sort-buttons {
+        width: 100%;
+        justify-content: stretch;
+        flex-wrap: wrap;
+    }
+
+    .sort-buttons .sort-btn {
+        flex: 1 1 30%;
+    }
+
+    .search-history-section details,
+    .search-history-section summary,
+    .search-history-items,
+    .search-history-item {
+        width: 100%;
     }
     
     .sort-btn {
@@ -2625,12 +2805,28 @@ input[type="number"]::-webkit-outer-spin-button:hover {
     }
     
     .marker-modal {
-        min-width: 320px !important;
-        max-width: 95vw !important;
+        width: min(calc(100vw - 24px), 420px) !important;
+        min-width: 0 !important;
+        max-width: calc(100vw - 24px) !important;
         left: 50% !important;
         transform: translateX(-50%) !important;
-        top: 20px !important;
-        max-height: calc(100vh - 40px) !important;
+        top: calc(12px + env(safe-area-inset-top, 0px)) !important;
+        max-height: calc(100dvh - 24px - env(safe-area-inset-top, 0px)) !important;
+    }
+
+    .modal-header {
+        padding: 12px 14px;
+    }
+
+    .modal-header h3 {
+        font-size: 1rem;
+        margin-right: 10px;
+    }
+
+    .modal-content {
+        padding: 14px;
+        padding-right: 12px;
+        gap: 12px;
     }
     
     .color-inputs {
@@ -2803,6 +2999,21 @@ input[type="range"]::-moz-range-thumb {
 }
 
 @media (max-width: 480px) {
+    .container {
+        padding:
+            calc(8px + env(safe-area-inset-top, 0px))
+            8px
+            calc(8px + env(safe-area-inset-bottom, 0px));
+    }
+
+    .map-container {
+        min-height: 360px;
+    }
+
+    #map {
+        height: 360px;
+    }
+
     .sort-btn {
         padding: 5px 6px;
         font-size: 0.8em;
@@ -2810,7 +3021,11 @@ input[type="range"]::-moz-range-thumb {
     }
     
     .marker-modal {
-        min-width: 380px !important;
+        width: calc(100vw - 16px) !important;
+        min-width: 0 !important;
+        max-width: calc(100vw - 16px) !important;
+        top: calc(8px + env(safe-area-inset-top, 0px)) !important;
+        max-height: calc(100dvh - 16px - env(safe-area-inset-top, 0px)) !important;
     }
     
     .color-inputs {
@@ -2827,7 +3042,9 @@ input[type="range"]::-moz-range-thumb {
 
 @media (max-width: 400px) {
     .marker-modal {
-        min-width: 350px !important;
+        width: calc(100vw - 12px) !important;
+        min-width: 0 !important;
+        max-width: calc(100vw - 12px) !important;
     }
     
     .color-inputs {
