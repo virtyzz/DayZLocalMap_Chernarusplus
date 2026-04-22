@@ -39,7 +39,7 @@ window.DayzMapScriptHelpers = (function () {
     }
 
     function getMapHref(mapId) {
-        return `${getRootPath()}index.html?map=${mapId}`;
+        return `${getRootPath()}?map=${mapId}`;
     }
 
     function getNamesDataPath(mapId) {
