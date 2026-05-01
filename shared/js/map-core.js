@@ -1126,6 +1126,7 @@ class DayZMap {
                     justify-content: center;
                 ">×</button>
             </div>
+            <p style="margin: 0;">${message}</p>
         `;
         
         document.getElementById('map').appendChild(errorDiv);
