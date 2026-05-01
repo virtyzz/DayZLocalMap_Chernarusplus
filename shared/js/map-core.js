@@ -1126,34 +1126,6 @@ class DayZMap {
                     justify-content: center;
                 ">×</button>
             </div>
-            <p style="margin: 0;">${message}</p>
-			<!-- 🔔 ДОБАВИТЬ: Гифка под ошибкой 
-			<img src="lnk/error_typing.gif" alt="Error" style="
-				display: block;
-				margin: 15px auto 0;
-				max-width: 100%;
-				max-height: 300px;
-				border-radius: 5px;
-				border: 2px solid #c0392b;
-			"> -->
-			<!-- 🔔 Локальное видео вместо гифки -->
-			<video 
-      				src="${window.DayzMapScriptHelpers.getAssetPath('shared/lnk/error_vid2.webm')}" 
-				autoplay  
-				loop 
-				playsinline
-              preload="auto"
-				style="
-					display: block;
-					margin: 15px auto 0;
-					width: 100%;
-					max-width: 560px;
-					max-height: 315px;
-					border-radius: 5px;
-					border: 2px solid #c0392b;
-					background: #000;
-				"
-			></video>
         `;
         
         document.getElementById('map').appendChild(errorDiv);
