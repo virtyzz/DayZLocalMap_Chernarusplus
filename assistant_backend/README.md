@@ -7,6 +7,8 @@
 - `assistant_api.py` — HTTP API для чата на карте
 - `kb_service.py` — поиск по базе знаний и генерация ответа через локальную Ollama
 - `rag_core.py` — индексация и поиск в `ChromaDB`
+- `index_kb.py` — ручная переиндексация базы знаний
+- `ask_kb.py` — локальная CLI-проверка ответов
 - `start-assistant-api.ps1` — локальный запуск на Windows
 
 База знаний берётся из:
@@ -28,11 +30,11 @@ python assistant_api.py --host 127.0.0.1 --port 8098
 Индексация базы:
 
 ```bash
-python ../../rag_bot/index_kb.py
+python index_kb.py
 ```
 
 Проверка ответа из той же базы:
 
 ```bash
-python ../../rag_bot/ask_kb.py "Как поставить метку?"
+python ask_kb.py "Как поставить метку?"
 ```
