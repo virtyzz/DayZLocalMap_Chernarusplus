@@ -8,6 +8,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parents[2]
 SITE_DIR = ROOT_DIR / "dayzmap_all_in_one"
 KB_DIR = ROOT_DIR / "knowledge_base"
+MAP_GUIDE_PATH = SITE_DIR / "shared" / "guide" / "user_guide.html"
 OUTPUT_PATH = SITE_DIR / "shared" / "data" / "assistant-kb.json"
 
 
@@ -126,10 +127,8 @@ def build_jsonl_chunks(path: Path) -> list[dict]:
 def load_chunks() -> list[dict]:
     files = [
         KB_DIR / "dayz_map_kb.md",
-        KB_DIR / "LOCAL_LLM_SETUP.md",
-        KB_DIR / "UBUNTU_24_04_RAG_SETUP.md",
         KB_DIR / "training_corpus.jsonl",
-        KB_DIR / "user_guide.html",
+        MAP_GUIDE_PATH,
     ]
 
     chunks: list[dict] = []

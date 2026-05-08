@@ -50,7 +50,7 @@
         return escapeHtml(text).replace(/\n/g, "<br>");
     }
 
-    function addMessage(role, text, sources) {
+    function addMessage(role, text) {
         const article = document.createElement("article");
         article.className = "map-assistant__message " + (
             role === "user"
@@ -61,23 +61,6 @@
         const body = document.createElement("p");
         body.innerHTML = formatMultiline(text);
         article.appendChild(body);
-
-        if (Array.isArray(sources) && sources.length > 0) {
-            const sourcesBlock = document.createElement("div");
-            sourcesBlock.className = "map-assistant__sources";
-            const label = document.createElement("strong");
-            label.textContent = "Источники:";
-            sourcesBlock.appendChild(label);
-
-            const list = document.createElement("ul");
-            sources.slice(0, 4).forEach(function (source) {
-                const item = document.createElement("li");
-                item.textContent = source.title + " (" + source.source + ", score " + source.score + ")";
-                list.appendChild(item);
-            });
-            sourcesBlock.appendChild(list);
-            article.appendChild(sourcesBlock);
-        }
 
         messagesNode.appendChild(article);
         messagesNode.scrollTop = messagesNode.scrollHeight;
@@ -199,7 +182,7 @@
                 throw new Error(payload.error || "Не удалось получить ответ");
             }
 
-            addMessage("assistant", payload.answer, payload.sources || []);
+            addMessage("assistant", payload.answer);
             setStatus("Ответ получен для карты " + selectedMap.mapName, "success");
             input.value = "";
             persistDraft();
