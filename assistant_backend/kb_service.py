@@ -77,6 +77,21 @@ def cleanup_answer(text: str) -> str:
     return cleaned.strip()
 
 
+def build_answer_instructions(question: str, context: str) -> str:
+    lowered_question = question.lower()
+    lowered_context = context.lower()
+    instructions: list[str] = []
+
+    if ("поставить метку" in lowered_question or "добавить метку" in lowered_question) and "воткнуть метку" in lowered_context:
+        instructions.append(
+            "Если в материале есть кнопка \"Воткнуть метку\", перечисли этот вариант как отдельный третий способ добавления метки, а не как часть обычного добавления по координатам."
+        )
+
+    if instructions:
+        return "\n".join(instructions)
+    return ""
+
+
 class DayzKnowledgeService:
     def __init__(self) -> None:
         load_env()
@@ -139,6 +154,9 @@ class DayzKnowledgeService:
         if map_id or map_name:
             selected_map_block = f"Выбранная карта на сайте:\n- id: {map_id or 'unknown'}\n- name: {map_name or 'unknown'}\n\n"
 
+        extra_instructions = build_answer_instructions(cleaned_question, context)
+        extra_block = f"\n\nДополнительные указания:\n{extra_instructions}" if extra_instructions else ""
+
         answer = ollama.chat(
             [
                 {"role": "system", "content": SYSTEM_PROMPT},
@@ -147,7 +165,7 @@ class DayzKnowledgeService:
                     "content": (
                         f"{selected_map_block}"
                         f"Материал базы знаний:\n\n{context}\n\n"
-                        f"Вопрос: {cleaned_question}\n\n"
+                        f"Вопрос: {cleaned_question}{extra_block}\n\n"
                         "Ответь обычным текстом без markdown-разметки и без ссылок на контекст."
                     ),
                 },
