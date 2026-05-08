@@ -290,15 +290,12 @@ def build_context_block(results: list[dict], min_score: float) -> str:
         return ""
 
     parts = []
-    for idx, item in enumerate(filtered, start=1):
+    for item in filtered:
         meta = item["metadata"]
         parts.append(
             "\n".join(
                 [
-                    f"[Context {idx}]",
-                    f"Source: {meta.get('source', 'unknown')}",
-                    f"Title: {meta.get('title', 'unknown')}",
-                    f"Chunk: {meta.get('chunk_index', '?')}",
+                    f"Документ: {meta.get('title', 'unknown')}",
                     item["document"],
                 ]
             )

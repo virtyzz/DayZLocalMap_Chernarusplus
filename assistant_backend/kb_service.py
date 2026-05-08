@@ -20,9 +20,11 @@ SYSTEM_PROMPT = """Ты отвечаешь только по базе знани
 6. Для пользовательских действий по возможности указывай точные названия кнопок, полей и пунктов интерфейса из базы знаний.
 7. Если есть несколько способов выполнить действие, перечисли их явно.
 8. Будь конкретным: не ограничивайся общим описанием, если в материале есть шаги.
-9. Никогда не вставляй выдуманные ссылки, URL, ссылки вида [Context 1] или фразы вроде "как указано в Context 6".
+9. Никогда не вставляй выдуманные ссылки, URL, ссылки вида [Context 1] и фразы вроде "как указано в Context 6".
 10. Не упоминай слова "контекст", "context", "источник", "sources" в ответе пользователю.
-11. Не оформляй ответ как сообщение для Discord: не используй разделители из --- и избегай лишней markdown-разметки, если можно ответить обычным текстом.
+11. Не оформляй ответ как сообщение для Discord: не используй разделители из ---, цитаты через >, заголовки ### и лишнюю markdown-разметку.
+12. Отвечай обычным текстом. Допустимы только простые нумерованные шаги и короткие списки.
+13. Не ссылайся на служебные пометки вида (#context-6) или похожие якоря.
 """.strip()
 
 
@@ -56,16 +58,22 @@ def cleanup_answer(text: str) -> str:
     cleaned = re.sub(r"\bContext\s*\d+\b", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\bкак указано в Context\s*\d+\b", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\bисточники:\s*$", "", cleaned, flags=re.IGNORECASE | re.MULTILINE)
+    cleaned = re.sub(r"(?im)^\s*(source|title|chunk|document|документ)\s*:\s*", "", cleaned)
     cleaned = re.sub(r"(?m)^\s*---\s*$", "", cleaned)
     cleaned = re.sub(r"(?m)^\s{0,3}#{1,6}\s*", "", cleaned)
+    cleaned = re.sub(r"(?m)^\s*>\s*", "", cleaned)
+    cleaned = re.sub(r"\[([^\]]+)\]\((#[^)]+|[^)]+)\)", r"\1", cleaned)
+    cleaned = re.sub(r"\(#context-[^)]+\)", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\*\*(.*?)\*\*", r"\1", cleaned)
     cleaned = re.sub(r"\*(.*?)\*", r"\1", cleaned)
     cleaned = re.sub(r"`([^`]+)`", r"\1", cleaned)
-    cleaned = re.sub(r"(?m)^\s*[-*]\s+", "• ", cleaned)
+    cleaned = re.sub(r"(?m)^\s*[-*]\s+", "- ", cleaned)
     cleaned = re.sub(r"\(\s*согласно[^)]*\)", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\(\s*как указано[^)]*\)", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
     cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
     cleaned = re.sub(r"\(\s*\)", "", cleaned)
+    cleaned = re.sub(r"\s+\.", ".", cleaned)
     return cleaned.strip()
 
 
@@ -98,7 +106,14 @@ class DayzKnowledgeService:
             pieces.append(f"selected map {map_name}")
         return "\n".join(piece for piece in pieces if piece)
 
-    def answer_question(self, question: str, map_id: str | None = None, map_name: str | None = None, top_k: int | None = None, min_score: float | None = None) -> AnswerPayload:
+    def answer_question(
+        self,
+        question: str,
+        map_id: str | None = None,
+        map_name: str | None = None,
+        top_k: int | None = None,
+        min_score: float | None = None,
+    ) -> AnswerPayload:
         cleaned_question = (question or "").strip()
         if not cleaned_question:
             raise ValueError("Question is empty")
@@ -121,7 +136,15 @@ class DayzKnowledgeService:
         answer = ollama.chat(
             [
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": f"{selected_map_block}Материал базы знаний:\n\n{context}\n\nВопрос: {cleaned_question}"},
+                {
+                    "role": "user",
+                    "content": (
+                        f"{selected_map_block}"
+                        f"Материал базы знаний:\n\n{context}\n\n"
+                        f"Вопрос: {cleaned_question}\n\n"
+                        "Ответь обычным текстом без markdown-разметки и без ссылок на контекст."
+                    ),
+                },
             ]
         )
         return AnswerPayload(cleanup_answer(answer), sources, True)
