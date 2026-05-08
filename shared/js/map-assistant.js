@@ -101,9 +101,41 @@
             });
     }
 
+    function expandQuestion(question) {
+        const lowered = normalizeRussianYo(question);
+        const additions = [];
+
+        if (lowered.includes("метк")) {
+            additions.push("метка метки маркер маркеры");
+        }
+        if (lowered.includes("постав")) {
+            additions.push("поставить добавить воткнуть разместить");
+        }
+        if (lowered.includes("добав")) {
+            additions.push("добавить поставить создать");
+        }
+        if (lowered.includes("координат")) {
+            additions.push("координаты x y dayz");
+        }
+        if (lowered.includes("маршрут")) {
+            additions.push("построить маршрут route");
+        }
+        if (lowered.includes("иск") || lowered.includes("найт")) {
+            additions.push("поиск найти фильтр история поиска");
+        }
+        if (lowered.includes("фигур") || lowered.includes("рисова")) {
+            additions.push("фигуры круг прямоугольник линия многоугольник");
+        }
+        if (lowered.includes("измер")) {
+            additions.push("измерение расстояние линейка");
+        }
+
+        return [question.trim()].concat(additions).join(" ");
+    }
+
     function buildSearchQuery(question, selectedMap) {
         return [
-            question.trim(),
+            expandQuestion(question),
             selectedMap.mapId ? "selected map " + selectedMap.mapId : "",
             selectedMap.mapName ? "selected map " + selectedMap.mapName : ""
         ].filter(Boolean).join(" ");
@@ -125,6 +157,8 @@
 
     function scoreChunk(chunk, queryTokens, selectedMap) {
         const chunkText = normalizeRussianYo(chunk.text || "");
+        const chunkTitle = normalizeRussianYo(chunk.title || "");
+        const chunkSource = normalizeRussianYo(chunk.source || "");
         const chunkTokens = new Set(tokenize(chunkText));
         let overlap = 0;
 
@@ -135,13 +169,24 @@
         });
 
         let score = overlap / Math.max(queryTokens.length, 1);
+        const queryText = queryTokens.join(" ");
+
+        queryTokens.forEach(function (token) {
+            if (chunkText.includes(token)) {
+                score += 0.015;
+            }
+            if (chunkTitle.includes(token)) {
+                score += 0.03;
+            }
+        });
+
         if (chunkText.includes(normalizeRussianYo(selectedMap.mapName))) {
             score += 0.12;
         }
         if (chunkText.includes(normalizeRussianYo(selectedMap.mapId))) {
             score += 0.08;
         }
-        if (chunk.title && normalizeRussianYo(chunk.title).includes(normalizeRussianYo(selectedMap.mapName))) {
+        if (chunkTitle.includes(normalizeRussianYo(selectedMap.mapName))) {
             score += 0.1;
         }
         if (chunk.source === "training_corpus.jsonl") {
@@ -149,6 +194,42 @@
         }
         if (chunk.source === "dayz_map_kb.md") {
             score += 0.03;
+        }
+        if (chunk.source === "user_guide.html") {
+            score += 0.05;
+        }
+        if (chunkSource.includes("user_guide") && (queryText.includes("как") || queryText.includes("постав"))) {
+            score += 0.08;
+        }
+
+        if (queryText.includes("метк")) {
+            if (chunkText.includes("добавление меток")) {
+                score += 0.35;
+            }
+            if (chunkText.includes("добавление метки")) {
+                score += 0.35;
+            }
+            if (chunkText.includes("добавить метку")) {
+                score += 0.35;
+            }
+            if (chunkText.includes("добавить по координатам")) {
+                score += 0.12;
+            }
+            if (chunkText.includes("мои метки")) {
+                score += 0.04;
+            }
+        }
+
+        if (queryText.includes("как") && queryText.includes("постав")) {
+            if (chunkText.includes("нажмите кнопку")) {
+                score += 0.18;
+            }
+            if (chunkText.includes("кликните")) {
+                score += 0.12;
+            }
+            if (chunkText.includes("пошаг")) {
+                score += 0.1;
+            }
         }
 
         return score;
