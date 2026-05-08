@@ -50,6 +50,18 @@
         return escapeHtml(text).replace(/\n/g, "<br>");
     }
 
+    function normalizeAssistantText(text) {
+        return String(text || "")
+            .replace(/\r\n/g, "\n")
+            .replace(/^\s{0,3}#{1,6}\s*/gm, "")
+            .replace(/\*\*(.*?)\*\*/g, "$1")
+            .replace(/\*(.*?)\*/g, "$1")
+            .replace(/`([^`]+)`/g, "$1")
+            .replace(/^\s*[-*]\s+/gm, "• ")
+            .replace(/\n{3,}/g, "\n\n")
+            .trim();
+    }
+
     function addMessage(role, text) {
         const article = document.createElement("article");
         article.className = "map-assistant__message " + (
@@ -59,7 +71,7 @@
         );
 
         const body = document.createElement("p");
-        body.innerHTML = formatMultiline(text);
+        body.innerHTML = formatMultiline(role === "assistant" ? normalizeAssistantText(text) : text);
         article.appendChild(body);
 
         messagesNode.appendChild(article);
