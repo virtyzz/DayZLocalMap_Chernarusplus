@@ -39,6 +39,13 @@ def get_int_env(name: str, default: int) -> int:
     return int(os.getenv(name, str(default)))
 
 
+def get_bool_env(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def resolve_path_env(name: str, default: Path) -> Path:
     raw_value = get_env(name, str(default))
     candidate = Path(raw_value)
@@ -57,11 +64,19 @@ class DocumentChunk:
 
 
 class OllamaClient:
-    def __init__(self, base_url: str, chat_model: str, embed_model: str, temperature: float = 0.0) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        chat_model: str,
+        embed_model: str,
+        temperature: float = 0.0,
+        think: bool = False,
+    ) -> None:
         self.base_url = base_url.rstrip("/")
         self.chat_model = chat_model
         self.embed_model = embed_model
         self.temperature = temperature
+        self.think = think
         self.session = requests.Session()
         self.session.timeout = 120
 
@@ -84,6 +99,7 @@ class OllamaClient:
             "model": self.chat_model,
             "messages": messages,
             "stream": False,
+            "think": self.think,
             "options": {
                 "temperature": self.temperature,
             },

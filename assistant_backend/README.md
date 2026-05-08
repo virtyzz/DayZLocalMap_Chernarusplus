@@ -31,6 +31,7 @@ python assistant_api.py --host 127.0.0.1 --port 8098
 
 - `OLLAMA_CHAT_MODEL` — чат-модель
 - `OLLAMA_EMBED_MODEL` — embedding-модель
+- `OLLAMA_THINK` — включает или выключает reasoning/thinking режим у thinking-моделей; для RAG рекомендуется `false`
 - `OLLAMA_TEMPERATURE` — температура генерации; для стабильных ответов по базе знаний рекомендуется `0`
 
 Индексация базы:

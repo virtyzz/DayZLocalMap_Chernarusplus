@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from rag_core import KnowledgeBase, OllamaClient, build_context_block, get_env, get_float_env, get_int_env, load_env, resolve_path_env
+from rag_core import KnowledgeBase, OllamaClient, build_context_block, get_bool_env, get_env, get_float_env, get_int_env, load_env, resolve_path_env
 
 
 DEFAULT_EMPTY_ANSWER = "В базе знаний нет точного ответа на этот вопрос."
@@ -98,6 +98,7 @@ class DayzKnowledgeService:
         self.ollama_url = get_env("OLLAMA_URL", "http://127.0.0.1:11434")
         self.chat_model = get_env("OLLAMA_CHAT_MODEL", "qwen3:4b")
         self.embed_model = get_env("OLLAMA_EMBED_MODEL", "bge-m3")
+        self.think = get_bool_env("OLLAMA_THINK", False)
         self.temperature = get_float_env("OLLAMA_TEMPERATURE", 0.0)
         self.chroma_dir = resolve_path_env("CHROMA_DIR", Path("./chroma_db"))
         self.collection_name = get_env("CHROMA_COLLECTION", "dayz_map_kb")
@@ -113,6 +114,7 @@ class DayzKnowledgeService:
                 self.chat_model,
                 self.embed_model,
                 temperature=self.temperature,
+                think=self.think,
             )
             self._ollama.healthcheck()
         if self._kb is None:
