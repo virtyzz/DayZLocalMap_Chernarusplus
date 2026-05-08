@@ -79,7 +79,14 @@ class OllamaClient:
         return embeddings[0]
 
     def chat(self, messages: list[dict[str, str]]) -> str:
-        payload = {"model": self.chat_model, "messages": messages, "stream": False}
+        payload = {
+            "model": self.chat_model,
+            "messages": messages,
+            "stream": False,
+            "options": {
+                "temperature": 0,
+            },
+        }
         response = self.session.post(f"{self.base_url}/api/chat", json=payload, timeout=240)
         response.raise_for_status()
         data = response.json()
