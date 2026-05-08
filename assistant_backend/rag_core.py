@@ -57,10 +57,11 @@ class DocumentChunk:
 
 
 class OllamaClient:
-    def __init__(self, base_url: str, chat_model: str, embed_model: str) -> None:
+    def __init__(self, base_url: str, chat_model: str, embed_model: str, temperature: float = 0.0) -> None:
         self.base_url = base_url.rstrip("/")
         self.chat_model = chat_model
         self.embed_model = embed_model
+        self.temperature = temperature
         self.session = requests.Session()
         self.session.timeout = 120
 
@@ -84,7 +85,7 @@ class OllamaClient:
             "messages": messages,
             "stream": False,
             "options": {
-                "temperature": 0,
+                "temperature": self.temperature,
             },
         }
         response = self.session.post(f"{self.base_url}/api/chat", json=payload, timeout=240)

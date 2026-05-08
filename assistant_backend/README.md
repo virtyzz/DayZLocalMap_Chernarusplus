@@ -27,6 +27,12 @@ cp .env.example .env
 python assistant_api.py --host 127.0.0.1 --port 8098
 ```
 
+Основные настройки в `.env`:
+
+- `OLLAMA_CHAT_MODEL` — чат-модель
+- `OLLAMA_EMBED_MODEL` — embedding-модель
+- `OLLAMA_TEMPERATURE` — температура генерации; для стабильных ответов по базе знаний рекомендуется `0`
+
 Индексация базы:
 
 ```bash

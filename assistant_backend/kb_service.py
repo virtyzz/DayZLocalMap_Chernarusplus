@@ -83,6 +83,7 @@ class DayzKnowledgeService:
         self.ollama_url = get_env("OLLAMA_URL", "http://127.0.0.1:11434")
         self.chat_model = get_env("OLLAMA_CHAT_MODEL", "qwen3:4b")
         self.embed_model = get_env("OLLAMA_EMBED_MODEL", "bge-m3")
+        self.temperature = get_float_env("OLLAMA_TEMPERATURE", 0.0)
         self.chroma_dir = resolve_path_env("CHROMA_DIR", Path("./chroma_db"))
         self.collection_name = get_env("CHROMA_COLLECTION", "dayz_map_kb")
         self.top_k = get_int_env("KB_TOP_K", 3)
@@ -92,7 +93,12 @@ class DayzKnowledgeService:
 
     def _ensure_clients(self) -> tuple[OllamaClient, KnowledgeBase]:
         if self._ollama is None:
-            self._ollama = OllamaClient(self.ollama_url, self.chat_model, self.embed_model)
+            self._ollama = OllamaClient(
+                self.ollama_url,
+                self.chat_model,
+                self.embed_model,
+                temperature=self.temperature,
+            )
             self._ollama.healthcheck()
         if self._kb is None:
             self._kb = KnowledgeBase(self.chroma_dir, self.collection_name, self._ollama)
