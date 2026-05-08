@@ -92,6 +92,39 @@
         
         <div class="map-container">
             <div id="map"></div>
+            <div class="map-assistant" id="mapAssistant" aria-live="polite">
+                <button class="map-assistant__toggle" id="mapAssistantToggle" type="button" aria-expanded="false" aria-controls="mapAssistantPanel">
+                    <span class="map-assistant__toggle-label">AI</span>
+                    <span class="map-assistant__toggle-text">Помощник по карте</span>
+                </button>
+                <section class="map-assistant__panel" id="mapAssistantPanel" hidden>
+                    <div class="map-assistant__header">
+                        <div>
+                            <h2>Помощник по карте</h2>
+                            <p id="mapAssistantStatus">Отвечает через локальную RAG-модель</p>
+                        </div>
+                        <button class="map-assistant__ghost" id="mapAssistantClear" type="button">Очистить</button>
+                    </div>
+                    <div class="map-assistant__messages" id="mapAssistantMessages">
+                        <article class="map-assistant__message map-assistant__message--assistant">
+                            <p>Спросите про текущую карту, функции сайта, координаты, маркеры или поиск по карте.</p>
+                        </article>
+                    </div>
+                    <form class="map-assistant__form" id="mapAssistantForm">
+                        <label class="sr-only" for="mapAssistantInput">Вопрос по карте</label>
+                        <textarea
+                            id="mapAssistantInput"
+                            rows="3"
+                            maxlength="1500"
+                            placeholder="Например: как поставить метку на этой карте?"
+                        ></textarea>
+                        <div class="map-assistant__actions">
+                            <span class="map-assistant__hint">Enter отправляет, Shift+Enter переносит строку</span>
+                            <button id="mapAssistantSend" type="submit">Спросить</button>
+                        </div>
+                    </form>
+                </section>
+            </div>
         </div>
         
         <div class="sidebar">
@@ -240,6 +273,8 @@
     <script src="shared/js/map_shapes.js"></script>
     <script src="shared/js/measurement.js"></script>
     <script src="shared/js/bulk_import.js"></script>
+    <script src="shared/js/map-assistant-config.js"></script>
+    <script src="shared/js/map-assistant.js"></script>
 
 </body>
 </html>
