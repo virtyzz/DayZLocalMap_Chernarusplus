@@ -4531,6 +4531,10 @@ input[type="range"]::-moz-range-thumb {
     backdrop-filter: blur(24px);
 }
 
+.map-assistant__panel[hidden] {
+    display: none !important;
+}
+
 .map-assistant__header {
     display: flex;
     align-items: flex-start;

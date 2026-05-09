@@ -14,7 +14,7 @@
     const sendButton = document.getElementById("mapAssistantSend");
     const assistantConfig = window.DayzMapAssistantConfig || {};
 
-    const storageKey = "dayzMapAssistantOpen";
+    const storageKey = "dayzMapAssistantOpenV2";
     const historyStorageKey = "dayzMapAssistantDraft";
     const assistantApiBaseUrl = assistantConfig.ollamaBaseUrl || "./assistant-api/";
     const requestTimeoutMs = Number(assistantConfig.requestTimeoutMs || 300000);
@@ -120,7 +120,8 @@
 
     function loadInitialUiState() {
         try {
-            const savedOpen = window.localStorage.getItem(storageKey) === "1";
+            const savedValue = window.localStorage.getItem(storageKey);
+            const savedOpen = savedValue === "1";
             const savedDraft = window.localStorage.getItem(historyStorageKey);
             if (savedDraft) {
                 input.value = savedDraft;
