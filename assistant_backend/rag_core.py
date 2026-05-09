@@ -170,8 +170,7 @@ class KnowledgeBase:
             doc_tokens = set(tokenize_for_search(document))
             overlap = len(query_tokens & doc_tokens)
             lexical_score = overlap / max(1, len(query_tokens))
-            score = (vector_score * 0.55) + (lexical_score * 0.45)
-            score += contextual_rerank_bonus(expanded_query, document, metadata or {})
+            score = (vector_score * 0.7) + (lexical_score * 0.3)
             items.append(
                 {
                     "id": doc_id,
@@ -195,51 +194,6 @@ def tokenize_for_search(text: str) -> list[str]:
     normalized = text.lower().replace("ё", "е")
     normalized = re.sub(r"[^a-zа-я0-9\s<>@_-]+", " ", normalized)
     return [token for token in normalized.split() if len(token) >= 2]
-
-
-def contextual_rerank_bonus(query: str, document: str, metadata: dict) -> float:
-    query_lower = query.lower()
-    document_lower = document.lower()
-    title_lower = str(metadata.get("title", "")).lower()
-    bonus = 0.0
-
-    asks_about_markers = any(phrase in query_lower for phrase in ("поставить метку", "добавить метку", "воткнуть метку"))
-    if asks_about_markers:
-        on_topic_phrases = (
-            "добавление метки",
-            "добавление метки кликом",
-            "добавление метки по координатам",
-            "добавление метки по координатам из игры",
-            "добавить метку",
-            "добавить по координатам",
-            "воткнуть метку",
-            "x z y degree",
-        )
-        for phrase in on_topic_phrases:
-            if phrase in document_lower:
-                bonus += 0.12
-
-        if "user_guide" in title_lower:
-            bonus += 0.08
-
-        off_topic_phrases = (
-            "splitter",
-            "разделитель",
-            "объединение файлов",
-            "импортируйте",
-            "скачайте готовые файлы",
-            "privatemarkers",
-            "lbgroup",
-        )
-        for phrase in off_topic_phrases:
-            if phrase in document_lower:
-                bonus -= 0.18
-
-    asks_how_to = "как " in query_lower
-    if asks_how_to and any(phrase in document_lower for phrase in ("нажмите", "кликните", "появится окно", "введите координаты")):
-        bonus += 0.08
-
-    return bonus
 
 
 def expand_query(query: str) -> str:
