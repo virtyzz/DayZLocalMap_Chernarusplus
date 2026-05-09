@@ -87,6 +87,16 @@ class OllamaClient:
     def embed(self, text: str) -> list[float]:
         payload = {"model": self.embed_model, "input": text}
         response = self.session.post(f"{self.base_url}/api/embed", json=payload, timeout=120)
+        if response.status_code == 404:
+            legacy_payload = {"model": self.embed_model, "prompt": text}
+            legacy_response = self.session.post(f"{self.base_url}/api/embeddings", json=legacy_payload, timeout=120)
+            legacy_response.raise_for_status()
+            legacy_data = legacy_response.json()
+            embedding = legacy_data.get("embedding")
+            if not embedding or not isinstance(embedding, list):
+                raise RuntimeError("Ollama legacy embeddings response does not contain embedding")
+            return embedding
+
         response.raise_for_status()
         data = response.json()
         embeddings = data.get("embeddings")
