@@ -170,7 +170,8 @@ class KnowledgeBase:
             doc_tokens = set(tokenize_for_search(document))
             overlap = len(query_tokens & doc_tokens)
             lexical_score = overlap / max(1, len(query_tokens))
-            score = (vector_score * 0.7) + (lexical_score * 0.3)
+            score = (vector_score * 0.6) + (lexical_score * 0.4)
+            score += contextual_rerank_bonus(expanded_query, document, metadata or {})
             items.append(
                 {
                     "id": doc_id,
@@ -194,6 +195,80 @@ def tokenize_for_search(text: str) -> list[str]:
     normalized = text.lower().replace("ё", "е")
     normalized = re.sub(r"[^a-zа-я0-9\s<>@_-]+", " ", normalized)
     return [token for token in normalized.split() if len(token) >= 2]
+
+
+def contextual_rerank_bonus(query: str, document: str, metadata: dict) -> float:
+    query_lower = query.lower()
+    document_lower = document.lower()
+    title_lower = str(metadata.get("title", "")).lower()
+    bonus = 0.0
+
+    asks_about_marker_addition = any(
+        phrase in query_lower
+        for phrase in ("поставить метку", "добавить метку", "воткнуть метку")
+    )
+    if asks_about_marker_addition:
+        for phrase in (
+            "добавление метки",
+            "добавление метки кликом",
+            "добавление метки по координатам",
+            "добавление метки по координатам из игры",
+            "добавить метку",
+            "добавить по координатам",
+            "воткнуть метку",
+            "x z y degree",
+        ):
+            if phrase in document_lower:
+                bonus += 0.12
+
+        for phrase in (
+            "import",
+            "импорт",
+            "privatemarkers",
+            "lbgroup",
+            "splitter",
+            "разделитель",
+            "экспорт",
+        ):
+            if phrase in document_lower:
+                bonus -= 0.18
+
+    asks_about_marker_search = "найти метку" in query_lower or "поиск метки" in query_lower
+    if asks_about_marker_search:
+        for phrase in (
+            "поиск и фильтрация",
+            "простой поиск",
+            "расширенный поиск",
+            "поле поиска",
+            "мои метки",
+            "история поиска",
+            "поиск по типу",
+            "фильтр",
+        ):
+            if phrase in document_lower:
+                bonus += 0.12
+
+        for phrase in (
+            "privatemarkers",
+            "lbgroup",
+            "импорт меток",
+            "экспорт меток",
+            "копировать путь к папке с метками",
+            "splitter",
+            "разделитель",
+        ):
+            if phrase in document_lower:
+                bonus -= 0.22
+
+    if "user_guide" in title_lower:
+        bonus += 0.04
+
+    if "как " in query_lower and any(
+        phrase in document_lower for phrase in ("нажмите", "кликните", "введите", "выберите")
+    ):
+        bonus += 0.05
+
+    return bonus
 
 
 def expand_query(query: str) -> str:
