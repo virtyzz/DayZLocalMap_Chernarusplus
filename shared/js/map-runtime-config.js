@@ -32,10 +32,10 @@ window.DayzMapRuntime = (function () {
                 }
             },
             exportServers: [
-                { label: "chernarus-1", ip: "109.248.4.32", port: "2200" },
-                { label: "chernarus-2", ip: "109.248.4.32", port: "2206" },
-                { label: "chernarus-3", ip: "109.248.4.106", port: "2200" },
-                { label: "chernarus-4", ip: "109.248.4.106", port: "2206" }
+                { label: "chernarus-1", ip: "109.248.4.212", port: "2200" },
+                { label: "chernarus-2", ip: "109.248.4.212", port: "2206" },
+                { label: "chernarus-3", ip: "109.248.4.211", port: "2200" },
+                { label: "chernarus-4", ip: "109.248.4.211", port: "2206" }
             ]
         },
         deerisle: {
@@ -69,8 +69,8 @@ window.DayzMapRuntime = (function () {
                 }
             },
             exportServers: [
-                { label: "dungeon-1", ip: "109.248.4.32", port: "2218" },
-                { label: "dungeon-2", ip: "109.248.4.106", port: "2218" }
+                { label: "dungeon-1", ip: "109.248.4.212", port: "2218" },
+                { label: "dungeon-2", ip: "109.248.4.211", port: "2218" }
             ]
         },
         deadfall: {
@@ -104,8 +104,8 @@ window.DayzMapRuntime = (function () {
                 }
             },
             exportServers: [
-                { label: "deadfall-1", ip: "109.248.4.32", port: "2212" },
-                { label: "deadfall-2", ip: "109.248.4.106", port: "2212" }
+                { label: "deadfall-1", ip: "109.248.4.212", port: "2212" },
+                { label: "deadfall-2", ip: "109.248.4.211", port: "2212" }
             ]
         }
     };
