@@ -303,7 +303,7 @@
                     </div>
                     <div class="settings-input-group">
                         <label for="crystalToGameDollarRate">1 Кристалл = </label>
-                        <input type="number" id="crystalToGameDollarRate" min="1" placeholder="2500">
+                        <input type="number" id="crystalToGameDollarRate" min="1" placeholder="5000">
                         <span style="margin-left: 10px;">игровых долларов</span>
                     </div>
                 </div>
@@ -365,14 +365,14 @@
                 </div>
                 
                 <div class="conversion-rate" id="crystalToGameRate">
-                    1 Кристалл = 500,000 G₽ = 2,500 G$
+                    1 Кристалл = 500,000 G₽ = 5,000 G$
                 </div>
             </div>
         </div>
         
         <div class="footer">
             <p><a href="https://discord.com/channels/1191479186062319735/1211802852314447953/1399366641145610268">Курс "Российские рубли ↔ Игровая валюта" взят из дискорда YourWorld Dayz PVE</a></p>
-			<p>Курс на кристаллы устанавливают игроки</p>
+			<p><a href="https://discord.com/channels/1191479186062319735/1211802852314447953/1513963237635264602">Курс на кристаллы от 09.06.2026</a></p>
         </div>
     </div>
 
@@ -406,7 +406,7 @@
             let rubToGameRubRate = 150000000 / 1000; // 150,000,000 игровых рублей за 1000 RUB
             let rubToGameDollarRate = 1000000 / 1000; // 1,000,000 игровых долларов за 1000 RUB
             let crystalToGameRubRate = 500000; // 500,000 игровых рублей за 1 кристалл
-            let crystalToGameDollarRate = 2500; // 2,500 игровых долларов за 1 кристалл
+            let crystalToGameDollarRate = 5000; // 5,000 игровых долларов за 1 кристалл
             
             // Загружаем сохраненные настройки из localStorage
             function loadSettings() {
@@ -440,7 +440,7 @@
                     crystalToGameDollarRate = parseFloat(savedCrystalToDollarRate);
                     crystalToGameDollarRateInput.value = crystalToGameDollarRate;
                 } else {
-                    crystalToGameDollarRateInput.value = 2500;
+                    crystalToGameDollarRateInput.value = 5000;
                 }
                 
                 updateRateDisplays();
@@ -481,12 +481,12 @@
                 rubToGameRubRate = 150000000 / 1000;
                 rubToGameDollarRate = 1000000 / 1000;
                 crystalToGameRubRate = 500000;
-                crystalToGameDollarRate = 2500;
+                crystalToGameDollarRate = 5000;
                 
                 rubToGameRubRateInput.value = 150000000;
                 rubToGameDollarRateInput.value = 1000000;
                 crystalToGameRubRateInput.value = 500000;
-                crystalToGameDollarRateInput.value = 2500;
+                crystalToGameDollarRateInput.value = 5000;
                 
                 localStorage.removeItem('rubToGameRubRate');
                 localStorage.removeItem('rubToGameDollarRate');
