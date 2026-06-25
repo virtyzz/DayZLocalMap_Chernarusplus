@@ -2745,7 +2745,7 @@ class DayZMap {
 		}
 	}
 	
-    saveNewMarker(leafletLatLng, gameCoords) {
+    saveNewMarker(leafletLatLng, gameCoords, customUid = null) {
 		console.log('💾 Сохранение новой метки');
 		this.cleanupNearbySearch();
 		const markerText = document.getElementById('newMarkerText').value;
@@ -2802,9 +2802,10 @@ class DayZMap {
 			`);
 
 		// Для новых меток создаем базовый набор оригинальных данных С Z КООРДИНАТОЙ
+		const normalizedCustomUid = Number.isInteger(customUid) ? customUid : null;
 		const originalData = {
 			type: 5,
-			uid: Date.now() / 1000,
+			uid: normalizedCustomUid || (Date.now() / 1000),
 			name: markerText,
 			icon: this.getIconPathFromType(markerType),
 			position: [gameCoords.x, gameCoords.z || 0, gameCoords.y], // Сохраняем Z координату

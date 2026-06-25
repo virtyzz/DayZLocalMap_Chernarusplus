@@ -839,6 +839,7 @@ class BulkImportManager {
         };
 
         let addedCount = 0;
+        let nextBulkUid = this.getNextBulkImportUid();
 
         validMarkers.forEach(markerData => {
             try {
@@ -879,7 +880,8 @@ class BulkImportManager {
                 this.fillFormValues(markerData.name || 'Метка', markerData.type || 'default', r, g, b, colorRgb);
 
                 // Вызываем стандартную функцию добавления метки
-                this.dayzMap.saveNewMarker(leafletLatLng, gameCoords);
+                this.dayzMap.saveNewMarker(leafletLatLng, gameCoords, nextBulkUid);
+                nextBulkUid++;
 
                 addedCount++;
             } catch (error) {
@@ -895,6 +897,34 @@ class BulkImportManager {
         this.closeModal(modal, overlay);
 
         this.dayzMap.showSuccess(`Добавлено ${addedCount} меток`);
+    }
+
+    getNextBulkImportUid() {
+        const normalizedUids = (this.dayzMap.markers || [])
+            .map(marker => this.normalizeUidTo10Digits(marker?.originalData?.uid ?? marker?.id))
+            .filter(uid => uid !== null);
+
+        if (normalizedUids.length === 0) {
+            return Math.floor(Date.now() / 1000);
+        }
+
+        return Math.max(...normalizedUids) + 1;
+    }
+
+    normalizeUidTo10Digits(uid) {
+        if (uid === undefined || uid === null) {
+            return null;
+        }
+
+        const uidString = uid.toString();
+        if (!uidString) {
+            return null;
+        }
+
+        const normalized = uidString.length > 10 ? uidString.slice(0, 10) : uidString;
+        const parsed = parseInt(normalized, 10);
+
+        return Number.isFinite(parsed) ? parsed : null;
     }
 
     ensureFormElementsExist() {
