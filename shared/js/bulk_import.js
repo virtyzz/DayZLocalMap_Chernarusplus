@@ -508,7 +508,7 @@ class BulkImportManager {
                 this.validateMarker(id, modal);
                 // Проверяем дубликаты для всех маркеров
                 this.checkDuplicates();
-                this.renderContent(modal);
+                this.syncValidationState(modal);
                 this.updateSubmitButton(modal);
             });
         });
@@ -618,6 +618,26 @@ class BulkImportManager {
         }
 
         this.updateSubmitButton(modal);
+    }
+
+    syncValidationState(modal) {
+        this.markers.forEach((marker) => {
+            const row = modal.querySelector(`[data-id="${marker.id}"]`);
+            if (!row) return;
+
+            row.classList.remove('bulk-import-valid', 'bulk-import-invalid', 'bulk-import-duplicate');
+
+            if (marker.duplicate) {
+                row.classList.add('bulk-import-duplicate');
+                row.setAttribute('data-error', 'Р”СѓР±Р»РёРєР°С‚ РєРѕРѕСЂРґРёРЅР°С‚');
+            } else if (marker.error) {
+                row.classList.add('bulk-import-invalid');
+                row.setAttribute('data-error', marker.error);
+            } else {
+                row.classList.add('bulk-import-valid');
+                row.removeAttribute('data-error');
+            }
+        });
     }
 
     checkDuplicates() {
