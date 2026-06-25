@@ -156,7 +156,6 @@ class BulkImportManager {
         `;
 
         const modal = this.createModal('Массовый ввод меток', content);
-        modal.classList.add('bulk-import-modal');
 
         this.setupModalEvents(modal);
         this.renderContent(modal);
@@ -172,7 +171,7 @@ class BulkImportManager {
         ).join('');
     }
 
-    createModal(title, content) {
+    createModal(title, content, modalClass = 'bulk-import-modal') {
         // Создаём overlay
         const overlay = document.createElement('div');
         overlay.classList.add('bulk-import-overlay');
@@ -180,6 +179,7 @@ class BulkImportManager {
 
         // Создаём модальное окно
         const modal = document.createElement('div');
+        modal.classList.add(modalClass);
         modal.innerHTML = `
             <div class="bulk-import-header">
                 <h3>${this.escapeHtml(title)}</h3>
@@ -197,6 +197,7 @@ class BulkImportManager {
 
         document.body.appendChild(modal);
         overlay.classList.add('active');
+        this.prepareModalPosition(modal);
 
         // Перетаскивание
         this.makeDraggable(modal, modal.querySelector('.bulk-import-header'));
@@ -209,10 +210,24 @@ class BulkImportManager {
         return modal;
     }
 
+    prepareModalPosition(modal) {
+        modal.style.position = 'fixed';
+        modal.style.transform = 'none';
+
+        const rect = modal.getBoundingClientRect();
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        const modalWidth = Math.min(rect.width, viewportWidth * 0.95);
+        const left = Math.max(0, (viewportWidth - modalWidth) / 2);
+        const top = Math.max(0, (viewportHeight - rect.height) / 2);
+
+        modal.style.width = `${modalWidth}px`;
+        modal.style.left = `${left}px`;
+        modal.style.top = `${top}px`;
+    }
+
     makeDraggable(modal, header) {
         // Сбрасываем transform сразу при создании
-        modal.style.transform = 'none';
-        modal.style.position = 'fixed';
         
         let isDragging = false;
         let shiftX = 0;
@@ -238,11 +253,20 @@ class BulkImportManager {
             e.preventDefault();
             
             // Вычисляем новые координаты
+            const rect = modal.getBoundingClientRect();
+            const minVisibleWidth = Math.min(120, rect.width);
+            const minVisibleHeight = Math.min(48, rect.height);
+            const minLeft = minVisibleWidth - rect.width;
+            const maxLeft = window.innerWidth - minVisibleWidth;
+            const minTop = 0;
+            const maxTop = Math.max(0, window.innerHeight - minVisibleHeight);
             const newLeft = e.clientX - shiftX;
             const newTop = e.clientY - shiftY;
-            
-            modal.style.left = newLeft + 'px';
-            modal.style.top = newTop + 'px';
+            const boundedLeft = Math.min(Math.max(newLeft, minLeft), maxLeft);
+            const boundedTop = Math.min(Math.max(newTop, minTop), maxTop);
+
+            modal.style.left = boundedLeft + 'px';
+            modal.style.top = boundedTop + 'px';
         }
 
         function closeDragElement() {
@@ -877,6 +901,7 @@ class BulkImportManager {
 
         document.body.appendChild(modal);
         overlay.classList.add('active');
+        this.prepareModalPosition(modal);
 
         this.makeDraggable(modal, modal.querySelector('.bulk-import-header'));
 
