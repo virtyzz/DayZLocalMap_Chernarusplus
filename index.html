@@ -15,6 +15,7 @@
     <link rel="manifest" href="shared/ico/manifest.json">
     <meta name="msapplication-config" content="shared/ico/browserconfig.xml">
     <meta name="theme-color" content="#1a1a1a">
+    <link rel="preconnect" href="https://unpkg.com" crossorigin>
     <script src="shared/js/runtime-env.js"></script>
     <script>
         (function () {
@@ -22,6 +23,28 @@
             var enabled = String(env.DAYZ_MAP_ASSISTANT_ENABLED || "").toLowerCase();
             var isEnabled = enabled === "1" || enabled === "true" || enabled === "yes" || enabled === "on";
             document.documentElement.setAttribute("data-map-assistant-enabled", isEnabled ? "true" : "false");
+        })();
+    </script>
+    <script>
+        (function () {
+            var root = document.documentElement;
+            var isMobile = false;
+            var isOpen = false;
+
+            try {
+                isMobile = window.matchMedia("(max-width: 768px)").matches;
+            } catch (error) {
+                isMobile = false;
+            }
+
+            try {
+                isOpen = window.localStorage.getItem("dayzMapMobileControlsOpen") === "1";
+            } catch (error) {
+                isOpen = false;
+            }
+
+            root.setAttribute("data-mobile-controls-ready", isMobile ? "true" : "false");
+            root.setAttribute("data-mobile-controls-open", isMobile && isOpen ? "true" : "false");
         })();
     </script>
     <style>
@@ -270,10 +293,10 @@
             </div>
         </div>
     </div>
-    <script src="shared/js/map-script-helpers.js"></script>
-    <script src="shared/js/map-bootstrap.js"></script>
+    <script defer src="shared/js/map-script-helpers.js"></script>
+    <script defer src="shared/js/map-bootstrap.js"></script>
     <script>
-        (function () {
+        document.addEventListener("DOMContentLoaded", function () {
             const mapId = window.DayzMapBootstrap.defaultMapId;
             const mapName = window.DayzMapScriptHelpers.getMapName(mapId);
             const pageTitle = `DayZ ${mapName}`;
@@ -285,20 +308,24 @@
                 heading.textContent = pageTitle;
             }
 
-            document.write(`<script src="${window.DayzMapScriptHelpers.getNamesDataPath(mapId)}"><\/script>`);
-        })();
+            window.DayzMapBootstrap.namesDataReady = window.DayzMapBootstrap
+                .loadNamesData(mapId)
+                .then(function () {
+                    if (window.dayzMap && typeof window.dayzMap.initNames === "function") {
+                        window.dayzMap.initNames();
+                    }
+                })
+                .catch(function (error) {
+                    console.error("Failed to load names data.", error);
+                });
+        }, { once: true });
     </script>
-    <script src="js/map-nav.js"></script>
-    <script src="shared/js/mobile-controls.js"></script>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="shared/js/users_profiles.js"></script>
-    <script src="shared/js/map-runtime-config.js"></script>
-    <script src="shared/js/map-core.js"></script>
-    <script src="shared/js/map_shapes.js"></script>
-    <script src="shared/js/measurement.js"></script>
-    <script src="shared/js/bulk_import.js"></script>
-    <script src="shared/js/map-assistant-config.js"></script>
-    <script src="shared/js/map-assistant.js"></script>
+    <script defer src="js/map-nav.js"></script>
+    <script defer src="shared/js/mobile-controls.js"></script>
+    <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script defer src="shared/js/users_profiles.js"></script>
+    <script defer src="shared/js/map-runtime-config.js"></script>
+    <script defer src="shared/js/map-core.js"></script>
 
 </body>
 </html>

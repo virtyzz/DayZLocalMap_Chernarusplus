@@ -445,6 +445,60 @@ class DayZMap {
         this.setupMobileMapTouchGuards();
         this.initProfiles(); // Инициализируем менеджер профилей ПЕРЕД загрузкой меток
         this.bindEvents();
+        this.scheduleDeferredFeatures();
+    }
+
+    loadDeferredScript(relativePath) {
+        return window.DayzMapBootstrap.loadScriptOnce(
+            window.DayzMapScriptHelpers.getAssetPath(relativePath)
+        );
+    }
+
+    scheduleDeferredFeatures() {
+        const loadDeferredFeatures = () => {
+            this.loadDeferredScript('shared/js/measurement.js').catch((error) => {
+                console.error('Failed to load measurement feature.', error);
+            });
+
+            this.loadDeferredScript('shared/js/map_shapes.js').catch((error) => {
+                console.error('Failed to load shapes feature.', error);
+            });
+
+            this.loadDeferredScript('shared/js/map-assistant-config.js')
+                .then(() => this.loadDeferredScript('shared/js/map-assistant.js'))
+                .catch((error) => {
+                    console.error('Failed to load map assistant feature.', error);
+                });
+        };
+
+        if (typeof window.requestIdleCallback === 'function') {
+            window.requestIdleCallback(loadDeferredFeatures, { timeout: 2500 });
+            return;
+        }
+
+        window.setTimeout(loadDeferredFeatures, 1200);
+    }
+
+    ensureBulkImportManager() {
+        if (this.bulkImportManager) {
+            return Promise.resolve(this.bulkImportManager);
+        }
+
+        return this.loadDeferredScript('shared/js/bulk_import.js').then(() => {
+            if (!this.bulkImportManager && typeof BulkImportManager !== 'undefined') {
+                this.bulkImportManager = new BulkImportManager(this);
+            }
+
+            return this.bulkImportManager;
+        });
+    }
+
+    ensureShapesManager() {
+        if (this.shapesManager) {
+            return Promise.resolve(this.shapesManager);
+        }
+
+        return this.loadDeferredScript('shared/js/map_shapes.js').then(() => this.shapesManager);
     }
 
     initMap() {
@@ -1342,8 +1396,8 @@ class DayZMap {
 				// Кнопка Массовый ввод меток
 				const bulkImportMarkersBtn = document.getElementById('bulkImportMarkersBtn');
 				if (bulkImportMarkersBtn) {
-					bulkImportMarkersBtn.addEventListener('click', () => {
-						if (this.bulkImportManager) {
+					bulkImportMarkersBtn.addEventListener('click', async () => {
+						if (await this.ensureBulkImportManager()) {
 							this.bulkImportManager.showImportModal();
 						} else {
 							this.showError('Менеджер импорта не инициализирован');
@@ -1364,8 +1418,8 @@ class DayZMap {
 				// Кнопка Импорт фигур
 				const importShapesBtn = document.getElementById('importShapesBtn');
 				if (importShapesBtn) {
-					importShapesBtn.addEventListener('click', () => {
-						if (this.shapesManager) {
+					importShapesBtn.addEventListener('click', async () => {
+						if (await this.ensureShapesManager()) {
 							this.shapesManager.showImportDialog();
 						} else {
 							this.showError('Менеджер фигур еще не инициализирован');
@@ -1377,8 +1431,8 @@ class DayZMap {
 				// Кнопка Экспорт фигур
 				const exportShapesBtn = document.getElementById('exportShapesBtn');
 				if (exportShapesBtn) {
-					exportShapesBtn.addEventListener('click', () => {
-						if (this.shapesManager) {
+					exportShapesBtn.addEventListener('click', async () => {
+						if (await this.ensureShapesManager()) {
 							this.shapesManager.exportShapes();
 						} else {
 							this.showError('Менеджер фигур еще не инициализирован');

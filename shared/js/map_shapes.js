@@ -1019,28 +1019,43 @@ class MapShapesManager {
     }
 }
 
-// Инициализация после создания карты
-document.addEventListener('DOMContentLoaded', () => {
-    // Ждем инициализации dayzMap
+function initMapShapesManager() {
+    const attachProfileHook = () => {
+        if (!window.dayzMap?.profilesManager || window.dayzMap.profilesManager.__shapesHooked) {
+            return;
+        }
+
+        const originalLoadProfile = window.dayzMap.profilesManager.loadProfile;
+        window.dayzMap.profilesManager.loadProfile = function(...args) {
+            const result = originalLoadProfile.apply(this, args);
+            if (window.dayzMap.shapesManager) {
+                window.dayzMap.shapesManager.onProfileChanged();
+            }
+            return result;
+        };
+        window.dayzMap.profilesManager.__shapesHooked = true;
+    };
+
+    if (window.dayzMap && !window.dayzMap.shapesManager) {
+        window.dayzMap.shapesManager = new MapShapesManager(window.dayzMap);
+        attachProfileHook();
+        return;
+    }
+
     const checkDayZMap = setInterval(() => {
-        if (window.dayzMap) {
+        if (window.dayzMap && !window.dayzMap.shapesManager) {
             clearInterval(checkDayZMap);
             window.dayzMap.shapesManager = new MapShapesManager(window.dayzMap);
-            
-            // Подписываемся на смену профиля
-            if (window.dayzMap.profilesManager) {
-                const originalLoadProfile = window.dayzMap.profilesManager.loadProfile;
-                window.dayzMap.profilesManager.loadProfile = function(...args) {
-                    const result = originalLoadProfile.apply(this, args);
-                    if (window.dayzMap.shapesManager) {
-                        window.dayzMap.shapesManager.onProfileChanged();
-                    }
-                    return result;
-                };
-            }
+            attachProfileHook();
         }
     }, 100);
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initMapShapesManager, { once: true });
+} else {
+    initMapShapesManager();
+}
 
 // Делаем класс доступным глобально
 window.MapShapesManager = MapShapesManager;

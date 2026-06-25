@@ -458,16 +458,25 @@ class DistanceMeasurement {
     }
 }
 
-// Инициализация после создания карты
-document.addEventListener('DOMContentLoaded', () => {
-    // Ждем инициализации dayzMap
+function initDistanceMeasurement() {
+    if (window.dayzMap && !window.dayzMap.distanceMeasurement) {
+        window.dayzMap.distanceMeasurement = new DistanceMeasurement(window.dayzMap);
+        return;
+    }
+
     const checkDayZMap = setInterval(() => {
-        if (window.dayzMap) {
+        if (window.dayzMap && !window.dayzMap.distanceMeasurement) {
             clearInterval(checkDayZMap);
             window.dayzMap.distanceMeasurement = new DistanceMeasurement(window.dayzMap);
         }
     }, 100);
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initDistanceMeasurement, { once: true });
+} else {
+    initDistanceMeasurement();
+}
 
 // Делаем класс доступным глобально
 window.DistanceMeasurement = DistanceMeasurement;

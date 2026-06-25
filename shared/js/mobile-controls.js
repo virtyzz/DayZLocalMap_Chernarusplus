@@ -1,5 +1,6 @@
 (function () {
     const mediaQuery = window.matchMedia("(max-width: 768px)");
+    const root = document.documentElement;
     const header = document.querySelector(".header");
     const toggleButton = document.getElementById("mobileControlsToggle");
 
@@ -31,6 +32,8 @@
     }
 
     function applyState(isMobile, isOpen) {
+        root.setAttribute("data-mobile-controls-ready", isMobile ? "true" : "false");
+        root.setAttribute("data-mobile-controls-open", isMobile && isOpen ? "true" : "false");
         header.classList.toggle("mobile-controls-ready", isMobile);
         header.classList.toggle("mobile-controls-open", isMobile && isOpen);
         updateButton(isMobile && isOpen);
