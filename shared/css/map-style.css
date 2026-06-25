@@ -683,16 +683,18 @@ body {
     backdrop-filter: blur(10px);
 }
 
-#dayzCoordsInput {
-    width: min(100%, 200px);
-}
-
 /* Theme Selector - Fixed Width */
 .controls select#themeSelector {
     flex-grow: 0;
     width: 180px;
     min-width: 180px;
     max-width: 180px;
+}
+
+#dayzCoordsInput {
+    width: 200px;
+    min-width: 200px;
+    flex: 0 0 200px;
 }
 
 /* Modern Containers */
@@ -1479,7 +1481,7 @@ input[type="number"]::-webkit-outer-spin-button:hover {
     display: flex;
     gap: 5px;
     align-items: center;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     position: relative;
 }
 
@@ -2727,6 +2729,13 @@ input[type="number"]::-webkit-outer-spin-button:hover {
     .coord-inputs input,
     .coord-inputs input[type="text"] {
         width: 100%;
+        flex: 0 0 auto;
+    }
+
+    #dayzCoordsInput {
+        width: 100%;
+        min-width: 0;
+        flex: 0 0 auto;
     }
 
     .coord-inputs button {
