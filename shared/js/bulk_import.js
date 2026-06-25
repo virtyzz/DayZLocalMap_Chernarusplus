@@ -197,7 +197,9 @@ class BulkImportManager {
 
         document.body.appendChild(modal);
         overlay.classList.add('active');
+        this.appendResizeHandles(modal);
         this.prepareModalPosition(modal);
+        this.makeResizable(modal);
 
         // Перетаскивание
         this.makeDraggable(modal, modal.querySelector('.bulk-import-header'));
@@ -224,6 +226,91 @@ class BulkImportManager {
         modal.style.width = `${modalWidth}px`;
         modal.style.left = `${left}px`;
         modal.style.top = `${top}px`;
+    }
+
+    appendResizeHandles(modal) {
+        const directions = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
+        directions.forEach((direction) => {
+            const handle = document.createElement('div');
+            handle.className = `bulk-import-resize-handle bulk-import-resize-${direction}`;
+            handle.dataset.direction = direction;
+            modal.appendChild(handle);
+        });
+    }
+
+    makeResizable(modal) {
+        const minWidth = parseFloat(getComputedStyle(modal).minWidth) || 320;
+        const minHeight = 220;
+
+        modal.querySelectorAll('.bulk-import-resize-handle').forEach((handle) => {
+            handle.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const direction = handle.dataset.direction;
+                const startX = e.clientX;
+                const startY = e.clientY;
+                const startRect = modal.getBoundingClientRect();
+
+                const onMouseMove = (moveEvent) => {
+                    const dx = moveEvent.clientX - startX;
+                    const dy = moveEvent.clientY - startY;
+                    const next = {
+                        left: startRect.left,
+                        top: startRect.top,
+                        width: startRect.width,
+                        height: startRect.height
+                    };
+
+                    if (direction.includes('e')) {
+                        next.width = startRect.width + dx;
+                    }
+                    if (direction.includes('s')) {
+                        next.height = startRect.height + dy;
+                    }
+                    if (direction.includes('w')) {
+                        next.width = startRect.width - dx;
+                        next.left = startRect.left + dx;
+                    }
+                    if (direction.includes('n')) {
+                        next.height = startRect.height - dy;
+                        next.top = startRect.top + dy;
+                    }
+
+                    if (next.width < minWidth) {
+                        if (direction.includes('w')) {
+                            next.left -= (minWidth - next.width);
+                        }
+                        next.width = minWidth;
+                    }
+
+                    if (next.height < minHeight) {
+                        if (direction.includes('n')) {
+                            next.top -= (minHeight - next.height);
+                        }
+                        next.height = minHeight;
+                    }
+
+                    next.left = Math.min(Math.max(next.left, 0), window.innerWidth - next.width);
+                    next.top = Math.min(Math.max(next.top, 0), window.innerHeight - next.height);
+                    next.width = Math.min(next.width, window.innerWidth - next.left);
+                    next.height = Math.min(next.height, window.innerHeight - next.top);
+
+                    modal.style.left = `${next.left}px`;
+                    modal.style.top = `${next.top}px`;
+                    modal.style.width = `${next.width}px`;
+                    modal.style.height = `${next.height}px`;
+                };
+
+                const onMouseUp = () => {
+                    document.removeEventListener('mousemove', onMouseMove);
+                    document.removeEventListener('mouseup', onMouseUp);
+                };
+
+                document.addEventListener('mousemove', onMouseMove);
+                document.addEventListener('mouseup', onMouseUp);
+            });
+        });
     }
 
     makeDraggable(modal, header) {
@@ -901,7 +988,9 @@ class BulkImportManager {
 
         document.body.appendChild(modal);
         overlay.classList.add('active');
+        this.appendResizeHandles(modal);
         this.prepareModalPosition(modal);
+        this.makeResizable(modal);
 
         this.makeDraggable(modal, modal.querySelector('.bulk-import-header'));
 
