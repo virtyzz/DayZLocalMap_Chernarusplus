@@ -40,6 +40,8 @@
     display: flex;
     flex-direction: column;
     backdrop-filter: blur(20px);
+    resize: both;
+    overflow: hidden;
 }
 
 .bulk-import-header {
@@ -595,6 +597,8 @@
     display: flex;
     flex-direction: column;
     backdrop-filter: blur(20px);
+    resize: both;
+    overflow: hidden;
 }
 
 .bulk-import-styles-body {
