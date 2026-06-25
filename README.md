@@ -14,6 +14,12 @@
 ### Полное руководство пользователя:
 - https://dayz-map.ru/shared/guide/user_guide.html
 
+### Runtime env
+
+- Скопируйте `.env.example` в `.env`
+- Для временного отключения кнопки помощника по карте установите `DAYZ_MAP_ASSISTANT_ENABLED=false`
+- После изменения `.env` обновите runtime-конфиг командой `python tools/generate_runtime_env.py`
+
 ### Кратко про лицензию:
 - ✅ Дорабатывать — можно
 - 🔗 Делиться — нужно (включая SaaS)

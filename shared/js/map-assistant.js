@@ -13,6 +13,10 @@
     const clearButton = document.getElementById("mapAssistantClear");
     const sendButton = document.getElementById("mapAssistantSend");
     const assistantConfig = window.DayzMapAssistantConfig || {};
+    if (assistantConfig.enabled === false) {
+        assistantRoot.remove();
+        return;
+    }
 
     const storageKey = "dayzMapAssistantOpenV2";
     const historyStorageKey = "dayzMapAssistantDraft";

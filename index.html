@@ -15,6 +15,20 @@
     <link rel="manifest" href="shared/ico/manifest.json">
     <meta name="msapplication-config" content="shared/ico/browserconfig.xml">
     <meta name="theme-color" content="#1a1a1a">
+    <script src="shared/js/runtime-env.js"></script>
+    <script>
+        (function () {
+            var env = window.DayzMapRuntimeEnv || {};
+            var enabled = String(env.DAYZ_MAP_ASSISTANT_ENABLED || "").toLowerCase();
+            var isEnabled = enabled === "1" || enabled === "true" || enabled === "yes" || enabled === "on";
+            document.documentElement.setAttribute("data-map-assistant-enabled", isEnabled ? "true" : "false");
+        })();
+    </script>
+    <style>
+        html[data-map-assistant-enabled="false"] #mapAssistant {
+            display: none !important;
+        }
+    </style>
     <link rel="stylesheet" href="shared/css/map-style.css">
     <link rel="stylesheet" href="shared/css/bulk_import_styles.css">
     <link rel="stylesheet" href="css/map-nav.css">
