@@ -392,6 +392,25 @@ body {
     flex-wrap: wrap;
 }
 
+.mobile-controls-toggle {
+    display: none;
+    padding: 10px 14px;
+    min-height: 44px;
+    border: 1px solid var(--border-primary);
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--bg-tertiary), var(--bg-secondary));
+    color: var(--text-primary);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all var(--transition-normal);
+}
+
+.mobile-controls-toggle:hover {
+    border-color: var(--accent-secondary);
+    box-shadow: var(--shadow-md);
+}
+
 /* Profiles Container */
 .profiles-container {
     display: flex;
@@ -662,6 +681,10 @@ body {
     flex-grow: 1;
     min-width: 150px;
     backdrop-filter: blur(10px);
+}
+
+#dayzCoordsInput {
+    width: min(100%, 200px);
 }
 
 /* Theme Selector - Fixed Width */
@@ -2535,19 +2558,19 @@ input[type="number"]::-webkit-outer-spin-button:hover {
 
     .map-container {
         flex: 1;
-        min-height: 400px;
+        min-height: clamp(320px, 52dvh, 460px);
         overscroll-behavior: contain;
     }
 
     #map {
-        height: 400px;
+        height: clamp(320px, 52dvh, 460px);
         overscroll-behavior: contain;
-        touch-action: none;
+        touch-action: auto;
     }
 
     .leaflet-container {
         overscroll-behavior: contain;
-        touch-action: none;
+        touch-action: auto;
     }
 
     .leaflet-container,
@@ -2585,6 +2608,18 @@ input[type="number"]::-webkit-outer-spin-button:hover {
         width: 100%;
     }
 
+    .mobile-controls-toggle {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: min(100%, 320px);
+        margin: 0 auto;
+    }
+
+    .header.mobile-controls-ready:not(.mobile-controls-open) > :not(h1):not(.mobile-controls-toggle) {
+        display: none !important;
+    }
+
     .controls {
         flex-direction: column;
         flex-wrap: nowrap;
@@ -2612,7 +2647,7 @@ input[type="number"]::-webkit-outer-spin-button:hover {
 
     .controls button {
         width: 100%;
-        min-height: 40px;
+        min-height: 44px;
     }
 
     .controls > button,
@@ -2661,9 +2696,9 @@ input[type="number"]::-webkit-outer-spin-button:hover {
     }
 
     .profiles-controls button {
-        flex: 0 0 32px;
-        width: 32px;
-        height: 32px;
+        flex: 0 0 44px;
+        width: 44px;
+        height: 44px;
     }
 
     .controls select#themeSelector,
@@ -2671,7 +2706,7 @@ input[type="number"]::-webkit-outer-spin-button:hover {
         width: 100% !important;
         min-width: 0 !important;
         max-width: none !important;
-        min-height: 40px !important;
+        min-height: 44px !important;
     }
     
     .control-separator {
@@ -2704,21 +2739,21 @@ input[type="number"]::-webkit-outer-spin-button:hover {
         width: min(100%, 320px);
         margin-left: auto;
         margin-right: auto;
-        min-height: 40px;
+        min-height: 44px;
     }
 
     .coord-inputs .help-btn {
         align-self: center;
         margin-left: 0 !important;
         margin-right: 0 !important;
-        width: 24px !important;
-        min-width: 24px !important;
-        max-width: 24px !important;
-        height: 24px !important;
-        min-height: 24px !important;
-        max-height: 24px !important;
+        width: 44px !important;
+        min-width: 44px !important;
+        max-width: 44px !important;
+        height: 44px !important;
+        min-height: 44px !important;
+        max-height: 44px !important;
         padding: 0 !important;
-        flex: 0 0 24px;
+        flex: 0 0 44px;
     }
 
     /* Адаптация блока ввода координат для мобильных */
@@ -2761,6 +2796,14 @@ input[type="number"]::-webkit-outer-spin-button:hover {
         max-width: 100%;
     }
 
+    .city-search-map-panel {
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
+        min-width: min(280px, calc(100vw - 24px));
+        max-width: calc(100vw - 24px);
+    }
+
     .markers-search,
     .markers-list,
     .visibility-controls {
@@ -2801,7 +2844,7 @@ input[type="number"]::-webkit-outer-spin-button:hover {
     .sort-btn {
         padding: 6px 8px;
         font-size: 0.85em;
-        min-height: 36px;
+        min-height: 44px;
     }
     
     .marker-modal {
@@ -3007,11 +3050,11 @@ input[type="range"]::-moz-range-thumb {
     }
 
     .map-container {
-        min-height: 360px;
+        min-height: clamp(280px, 48dvh, 360px);
     }
 
     #map {
-        height: 360px;
+        height: clamp(280px, 48dvh, 360px);
     }
 
     .sort-btn {
@@ -4698,11 +4741,12 @@ input[type="range"]::-moz-range-thumb {
 
     .map-assistant__toggle {
         align-self: flex-end;
+        min-height: 44px;
     }
 
     .map-assistant__panel {
         width: 100%;
-        height: min(58vh, 520px);
+        height: min(46dvh, 420px);
     }
 
     .map-assistant__actions {

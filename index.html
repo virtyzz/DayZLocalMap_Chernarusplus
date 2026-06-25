@@ -38,7 +38,16 @@
     <div class="container">
         <div class="header">
             <h1>DayZ Chernarus</h1>
-            <div class="controls">
+            <button
+                id="mobileControlsToggle"
+                class="mobile-controls-toggle"
+                type="button"
+                aria-expanded="false"
+                aria-controls="headerControls"
+            >
+                Показать инструменты
+            </button>
+            <div class="controls" id="headerControls">
                 <button id="addMarkerBtn">Добавить метку</button>
                 <button id="clearMarkersBtn">Очистить все метки</button>
 				<div class="control-separator"></div>
@@ -67,7 +76,7 @@
                 </div>
 				<div class="control-separator"></div>
                 <div class="coord-inputs">
-                    <input type="text" id="dayzCoordsInput" placeholder="X Z Y Degree" style="width: 200px;">
+                    <input type="text" id="dayzCoordsInput" placeholder="X Z Y Degree">
                     <button id="centerCoordsBtn">Центрировать</button>
                     <button id="imHereBtn">Воткнуть метку</button>
 					<button id="coordsHelpBtn2" class="help-btn" title="Подсказка по использованию координат">?</button>
@@ -280,6 +289,7 @@
         })();
     </script>
     <script src="js/map-nav.js"></script>
+    <script src="shared/js/mobile-controls.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="shared/js/users_profiles.js"></script>
     <script src="shared/js/map-runtime-config.js"></script>
