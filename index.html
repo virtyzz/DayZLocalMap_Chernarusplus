@@ -305,7 +305,12 @@
             document.title = pageTitle;
 
             if (heading) {
-                heading.textContent = pageTitle;
+                const mapNavName = heading.querySelector(".map-nav__trigger-name");
+                if (mapNavName) {
+                    mapNavName.textContent = mapName;
+                } else {
+                    heading.textContent = pageTitle;
+                }
             }
 
             window.DayzMapBootstrap.namesDataReady = window.DayzMapBootstrap
