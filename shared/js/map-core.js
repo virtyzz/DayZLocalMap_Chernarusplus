@@ -685,14 +685,53 @@ class DayZMap {
 
 	// Вспомогательная функция для создания popup метки
 	createMarkerPopup(markerData) {
+		const { x, y, z = 0, degree = 0 } = markerData.gameCoords;
+		const dayzCoords = `&lt;${x} ${z} ${y}&gt; ${degree} Degree`;
+		const markerColor = markerData.color || this.getMarkerColor(markerData.type);
+
 		return `
 			<div class="marker-popup">
-				<strong>${markerData.text}</strong><br>
-				Тип: ${this.getMarkerTypeName(markerData.type)}<br>
-				Координаты: X:${markerData.gameCoords.x} Y:${markerData.gameCoords.y} Z:${markerData.gameCoords.z || 0}<br>
-				&lt;${markerData.gameCoords.x} ${markerData.gameCoords.z || 0} ${markerData.gameCoords.y}&gt; ${markerData.gameCoords.degree || 0} Degree <button style="font-size: 12px; padding: 2px 4px; margin-left: 5px; border: none; background: none; cursor: pointer;" onclick="navigator.clipboard.writeText('&lt;${markerData.gameCoords.x} ${markerData.gameCoords.z || 0} ${markerData.gameCoords.y}&gt; ${markerData.gameCoords.degree || 0} Degree')">📋</button>
+				<div class="marker-popup__header">
+					<strong class="marker-popup__title" style="color: ${markerColor}">${markerData.text}</strong>
+					<span class="marker-popup__type">${this.getMarkerTypeName(markerData.type)}</span>
+				</div>
+				<div class="marker-popup__section">
+					<span class="marker-popup__label">Координаты</span>
+					<div class="marker-popup__coords" aria-label="Координаты метки">
+						<button class="marker-popup__coord" type="button" title="Копировать X: ${x}" aria-label="Копировать координату X: ${x}" onclick="dayzMap.copyPopupValue('${x}', 'X', this)"><b>X</b>${x}</button>
+						<button class="marker-popup__coord" type="button" title="Копировать Y: ${y}" aria-label="Копировать координату Y: ${y}" onclick="dayzMap.copyPopupValue('${y}', 'Y', this)"><b>Y</b>${y}</button>
+						<button class="marker-popup__coord" type="button" title="Копировать Z: ${z}" aria-label="Копировать координату Z: ${z}" onclick="dayzMap.copyPopupValue('${z}', 'Z', this)"><b>Z</b>${z}</button>
+					</div>
+				</div>
+				<div class="marker-popup__section marker-popup__dayz-section">
+					<span class="marker-popup__label">Координата DayZ</span>
+					<button class="marker-popup__dayz-row" type="button" title="Копировать координату DayZ" aria-label="Копировать координату DayZ" onclick="dayzMap.copyPopupValue('${dayzCoords}', 'Координата DayZ', this)">
+						<code>${dayzCoords}</code>
+					</button>
+				</div>
 			</div>
 		`;
+	}
+
+	copyPopupValue(value, label, sourceElement) {
+		navigator.clipboard.writeText(String(value))
+			.then(() => this.showCopyFeedback(sourceElement, label === 'Координата DayZ' ? 'Скопировано' : `Скопировано: ${label}`))
+			.catch(() => this.showError('Не удалось скопировать значение'));
+	}
+
+	showCopyFeedback(sourceElement, message) {
+		document.querySelectorAll('.marker-popup__copy-feedback').forEach((feedback) => feedback.remove());
+
+		const rect = sourceElement.getBoundingClientRect();
+		const feedback = document.createElement('span');
+		feedback.className = 'marker-popup__copy-feedback';
+		feedback.setAttribute('role', 'status');
+		feedback.textContent = message;
+		feedback.style.left = `${rect.left + (rect.width / 2)}px`;
+		feedback.style.top = `${Math.max(8, rect.top - 6)}px`;
+		document.body.appendChild(feedback);
+
+		setTimeout(() => feedback.remove(), 1100);
 	}
 
 	// Вспомогательные функции для показа сообщений
