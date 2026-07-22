@@ -568,10 +568,29 @@ class UserProfilesManager {
             </div>
         `;
 
-        // Вставляем в header перед controls
-        const header = document.querySelector('.header');
+        // Добавляем к общим действиям перед статичным разделителем профилей.
+        // Выбор карты остаётся отдельным элементом в левой части заголовка.
         const controls = document.querySelector('.controls');
-        header.insertBefore(profilesContainer, controls);
+        const profilesSeparator = document.getElementById('profilesSeparator');
+        controls.insertBefore(profilesContainer, profilesSeparator);
+
+        const updateControlsSeparatorsVisibility = () => {
+            const separators = Array.from(controls.querySelectorAll(':scope > .control-separator'));
+            separators.forEach((separator) => separator.classList.remove('is-edge-aligned'));
+
+            requestAnimationFrame(() => {
+                separators.forEach((separator) => {
+                    const nextControl = separator.nextElementSibling;
+                    const isLastOnRow = nextControl
+                        && nextControl.getBoundingClientRect().top > separator.getBoundingClientRect().top + 8;
+
+                    separator.classList.toggle('is-edge-aligned', isLastOnRow);
+                });
+            });
+        };
+
+        window.addEventListener('resize', updateControlsSeparatorsVisibility);
+        updateControlsSeparatorsVisibility();
 
         // Добавляем обработчики событий
         document.getElementById('profileSelector').addEventListener('change', (e) => {

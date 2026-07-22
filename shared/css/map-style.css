@@ -390,6 +390,7 @@ body {
     gap: var(--space-sm);
     align-items: center;
     flex-wrap: wrap;
+    justify-content: flex-end;
 }
 
 .mobile-controls-toggle {
@@ -416,9 +417,6 @@ body {
     display: flex;
     gap: var(--space-sm);
     align-items: center;
-    margin-right: var(--space-md);
-    padding-right: var(--space-md);
-    border-right: 1px solid var(--border-primary);
 }
 
 .profiles-controls {
@@ -662,13 +660,13 @@ body {
 }
 
 /* Export Button */
-.controls button:last-child:not(.help-btn):not([id*="splitter"]) {
+.controls > button:last-child:not(.help-btn):not([id*="splitter"]) {
     background: linear-gradient(135deg, var(--accent-warning), #e67e22) !important;
     border-color: var(--accent-warning) !important;
     color: white !important;
 }
 
-.controls button:last-child:not(.help-btn):not([id*="splitter"]):hover {
+.controls > button:last-child:not(.help-btn):not([id*="splitter"]):hover {
     background: linear-gradient(135deg, #e67e22, #d35400) !important;
     box-shadow: 0 0 20px rgba(243, 156, 18, 0.4) !important;
     transform: translateY(-2px) !important;
@@ -1460,17 +1458,13 @@ input[type="number"]::-webkit-outer-spin-button:hover {
 }
 
 .marker-popup__coords {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    display: flex;
     gap: 5px;
 }
 
 .marker-popup__coord {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    overflow: hidden;
-    gap: 1px;
+    display: inline-flex;
+    width: fit-content;
     padding: 5px 7px;
     border: 0;
     border-radius: 4px;
@@ -1481,14 +1475,7 @@ input[type="number"]::-webkit-outer-spin-button:hover {
     font-size: 13px;
     text-align: left;
     font-variant-numeric: tabular-nums;
-    text-overflow: ellipsis;
     white-space: nowrap;
-}
-
-.marker-popup__coord b {
-    color: var(--text-muted);
-    font-family: Arial, sans-serif;
-    font-size: 10px;
 }
 
 .marker-popup__coord:hover {
@@ -1496,38 +1483,6 @@ input[type="number"]::-webkit-outer-spin-button:hover {
 }
 
 .marker-popup__coord:focus-visible {
-    outline: 2px solid #2980b9;
-    outline-offset: 1px;
-}
-
-.marker-popup__dayz-row {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    width: 100%;
-    padding: 4px 4px 4px 7px;
-    border: 1px solid var(--border-primary);
-    border-radius: 5px;
-    background: var(--bg-primary);
-    cursor: copy;
-    font: inherit;
-    text-align: left;
-}
-
-.marker-popup__dayz-row code {
-    min-width: 0;
-    overflow-x: auto;
-    color: var(--text-primary);
-    font-family: Consolas, 'Courier New', monospace;
-    font-size: 12px;
-    white-space: nowrap;
-}
-
-.marker-popup__dayz-row:hover {
-    background: var(--bg-tertiary);
-}
-
-.marker-popup__dayz-row:focus-visible {
     outline: 2px solid #2980b9;
     outline-offset: 1px;
 }
@@ -1820,6 +1775,10 @@ input[type="number"]::-webkit-outer-spin-button:hover {
     height: 30px;
     background: #555;
     margin: 0 5px;
+}
+
+.control-separator.is-edge-aligned {
+    display: none;
 }
 
 .coords-separator {

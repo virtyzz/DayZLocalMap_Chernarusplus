@@ -698,16 +698,12 @@ class DayZMap {
 				<div class="marker-popup__section">
 					<span class="marker-popup__label">Координаты</span>
 					<div class="marker-popup__coords" aria-label="Координаты метки">
-						<button class="marker-popup__coord" type="button" title="Копировать X: ${x}" aria-label="Копировать координату X: ${x}" onclick="dayzMap.copyPopupValue('${x}', 'X', this)"><b>X</b>${x}</button>
-						<button class="marker-popup__coord" type="button" title="Копировать Y: ${y}" aria-label="Копировать координату Y: ${y}" onclick="dayzMap.copyPopupValue('${y}', 'Y', this)"><b>Y</b>${y}</button>
-						<button class="marker-popup__coord" type="button" title="Копировать Z: ${z}" aria-label="Копировать координату Z: ${z}" onclick="dayzMap.copyPopupValue('${z}', 'Z', this)"><b>Z</b>${z}</button>
+						<button class="marker-popup__coord" type="button" title="Копировать X и Y" aria-label="Копировать координаты X и Y" onclick="dayzMap.copyPopupValue('X:${x} Y:${y}', 'X и Y', this)">X:${x} Y:${y}</button>
 					</div>
 				</div>
 				<div class="marker-popup__section marker-popup__dayz-section">
 					<span class="marker-popup__label">Координата DayZ</span>
-					<button class="marker-popup__dayz-row" type="button" title="Копировать координату DayZ" aria-label="Копировать координату DayZ" onclick="dayzMap.copyPopupValue('${dayzCoords}', 'Координата DayZ', this)">
-						<code>${dayzCoords}</code>
-					</button>
+					<button class="marker-popup__coord" type="button" title="Копировать координату DayZ" aria-label="Копировать координату DayZ" onclick="dayzMap.copyPopupValue('${dayzCoords}', 'Координата DayZ', this)">${dayzCoords}</button>
 				</div>
 			</div>
 		`;
@@ -2831,14 +2827,12 @@ class DayZMap {
 			textLabel.addTo(this.map);
 		}
 
-		marker.bindPopup(`
-				<div class="marker-popup">
-					<strong>${markerText}</strong><br>
-					Тип: ${this.getMarkerTypeName(markerType)}<br>
-					Координаты: X:${gameCoords.x} Y:${gameCoords.y} Z:${gameCoords.z || 0}<br>
-					&lt;${gameCoords.x} ${gameCoords.z || 0} ${gameCoords.y}&gt; ${gameCoords.degree || 0} Degree <button style="font-size: 12px; padding: 2px 4px; margin-left: 5px; border: none; background: none; cursor: pointer;" onclick="navigator.clipboard.writeText('&lt;${gameCoords.x} ${gameCoords.z || 0} ${gameCoords.y}&gt; ${gameCoords.degree || 0} Degree')">📋</button>
-				</div>
-			`);
+		marker.bindPopup(this.createMarkerPopup({
+			text: markerText,
+			type: markerType,
+			color: markerColor,
+			gameCoords
+		}));
 
 		// Для новых меток создаем базовый набор оригинальных данных С Z КООРДИНАТОЙ
 		const normalizedCustomUid = Number.isInteger(customUid) ? customUid : null;
@@ -3261,14 +3255,12 @@ class DayZMap {
 		const newTextLabel = this.createTextLabel(newText, newColor, 1.0);
 		markerData.textLabel.setIcon(newTextLabel);
 
-		markerData.marker.bindPopup(`
-			<div class="marker-popup">
-				<strong>${newText}</strong><br>
-				Тип: ${this.getMarkerTypeName(newType)}<br>
-				Координаты: X:${markerData.gameCoords.x} Y:${markerData.gameCoords.y} Z:${markerData.gameCoords.z || 0}<br>
-				&lt;${markerData.gameCoords.x} ${markerData.gameCoords.z || 0} ${markerData.gameCoords.y}&gt; ${markerData.gameCoords.degree || 0} Degree <button style="font-size: 12px; padding: 2px 4px; margin-left: 5px; border: none; background: none; cursor: pointer;" onclick="navigator.clipboard.writeText('&lt;${markerData.gameCoords.x} ${markerData.gameCoords.z || 0} ${markerData.gameCoords.y}&gt; ${markerData.gameCoords.degree || 0} Degree')">📋</button>
-			</div>
-		`);
+		markerData.marker.bindPopup(this.createMarkerPopup({
+			text: newText,
+			type: newType,
+			color: newColor,
+			gameCoords: markerData.gameCoords
+		}));
 
 		this.saveMarkers();
 		this.updateMarkersList();
@@ -3863,14 +3855,12 @@ class DayZMap {
 							this.editMarker(markerData);
 						});
 
-						marker.bindPopup(`
-							<div class="marker-popup">
-								<strong>${savedMarkerData.text}</strong><br>
-								Тип: ${this.getMarkerTypeName(savedMarkerData.type)}<br>
-								Координаты: X:${savedMarkerData.gameCoords.x} Y:${savedMarkerData.gameCoords.y} Z:${savedMarkerData.gameCoords.z || 0}<br>
-								&lt;${savedMarkerData.gameCoords.x} ${savedMarkerData.gameCoords.z || 0} ${savedMarkerData.gameCoords.y}&gt; ${savedMarkerData.gameCoords.degree || 0} Degree <button style="font-size: 12px; padding: 2px 4px; margin-left: 5px; border: none; background: none; cursor: pointer;" onclick="navigator.clipboard.writeText('&lt;${savedMarkerData.gameCoords.x} ${savedMarkerData.gameCoords.z || 0} ${savedMarkerData.gameCoords.y}&gt; ${savedMarkerData.gameCoords.degree || 0} Degree')">📋</button>
-							</div>
-						`);
+						marker.bindPopup(this.createMarkerPopup({
+							text: savedMarkerData.text,
+							type: savedMarkerData.type,
+							color,
+							gameCoords: savedMarkerData.gameCoords
+						}));
 
 						const textLabel = L.marker(leafletLatLng, {
 							icon: this.createTextLabel(savedMarkerData.text, color, 1.0),
@@ -4216,14 +4206,12 @@ class DayZMap {
                                 this.editMarker(markerData);
                             });
 
-                            markerObj.bindPopup(`
-                                <div class="marker-popup">
-                                    <strong>${markerName || 'Без названия'}</strong><br>
-                                    Тип: ${this.getMarkerTypeName(markerType)}<br>
-                                    Координаты: X:${gameCoords.x} Y:${gameCoords.y} Z:${z}<br>
-                                    &lt;${gameCoords.x} ${z} ${gameCoords.y}&gt; ${gameCoords.degree || 0} Degree <button style="font-size: 12px; padding: 2px 4px; margin-left: 5px; border: none; background: none; cursor: pointer;" onclick="navigator.clipboard.writeText('&lt;${gameCoords.x} ${z} ${gameCoords.y}&gt; ${gameCoords.degree || 0} Degree')">📋</button>
-                                </div>
-                            `);
+							markerObj.bindPopup(this.createMarkerPopup({
+								text: markerName || 'Без названия',
+								type: markerType,
+								color: markerColor,
+								gameCoords
+							}));
 
                             // Создаем текстовую метку только если есть название
                             let textLabel = null;
